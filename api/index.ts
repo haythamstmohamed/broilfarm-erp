@@ -13,9 +13,9 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 registerStorageProxy(app);
 registerOAuthRoutes(app);
 
-// Support both /api/trpc and /trpc mount points for Vercel rewrites
+// Support all URL prefix variants on Vercel (/api/trpc, /trpc, /)
 app.use(
-  ["/api/trpc", "/trpc"],
+  ["/api/trpc", "/trpc", "/"],
   createExpressMiddleware({
     router: appRouter,
     createContext,
