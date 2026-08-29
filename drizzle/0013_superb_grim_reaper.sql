@@ -1,0 +1,1 @@
+ALTER TABLE `saleWeighBatches` ADD `weighingStage` enum('tare_pending','filled') DEFAULT 'filled' NOT NULL;

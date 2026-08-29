@@ -1,0 +1,256 @@
+# Project TODO
+
+- [x] Establish a premium Arabic RTL visual system including Arabic typography, locale-aware numbers and dates, a refined green and ivory palette, and responsive interaction states.
+- [x] Implement an authentication-aware application shell with Arabic RTL sidebar navigation and farm/cycle context switching.
+- [x] Create an onboarding-first empty state with a guided first-farm and first-cycle setup wizard.
+- [x] Build dashboard KPI cards and Recharts visualizations for flock age, mortality, feed, average weight, and FCR.
+- [x] Create usable operational screens for farms, cycles, housing and battery cages, daily logs, medications, weight tracking, and reports.
+- [x] Add interaction flows for creating farms, cycles, daily records, cage definitions, weight samples, and medication or vaccination entries.
+- [x] Implement the cycle-closing report surface with total birds placed, mortality, feed, final weight, FCR, and EPEF.
+- [x] Add database schema and protected server procedures for farm operations and onboarding data.
+- [x] Write and run Vitest coverage for key calculation and application behavior.
+- [x] Verify desktop and mobile visual quality, run type checks and tests, and save the release checkpoint.
+- [x] Define farm-team roles, role capabilities, and invitation code lifecycle rules.
+- [x] Add persistent role assignments, scoped access, and invitation records to the database schema.
+- [x] Implement protected authorization checks and invitation generation, validation, redemption, and revocation procedures.
+- [x] Build Arabic RTL access-management screens for creating, viewing, copying, and revoking invitation codes.
+- [x] Verify role permissions and invitation controls with automated tests, visual review, and a release checkpoint.
+- [x] Add farm latitude, longitude, and location-source fields with cycle-day weather history storage.
+- [x] Integrate a weather data source for current and historical daily farm weather by coordinates.
+- [x] Capture or select farm coordinates during onboarding and farm creation.
+- [x] Show synchronized weather for the selected farm and cycle day on the Arabic dashboard.
+- [x] Add editable coordinates for existing farms from the weather missing-location action.
+- [x] Add a cycle-day date control so operators can view weather synchronized to a selected day of the cycle.
+- [x] Verify weather empty, loading, missing-location, and selected-day states before release.
+- [x] Test location, weather retrieval, and cycle-day synchronization, then save the release checkpoint.
+- [x] Add a farm-centered settings surface that groups houses and cycles under the selected farm.
+- [x] Update house and cycle creation flows to default to and validate the active farm context.
+- [x] Provide farm-specific summaries, counts, and direct configuration actions for houses and cycles.
+- [x] Verify farm-scoped settings navigation and save the release checkpoint.
+- [x] Remove the standalone production-cycle navigation item while retaining cycle settings inside farms.
+- [x] Show farm total house capacity, cycle birds placed, and remaining assignable birds in the farm workspace.
+- [x] Enforce server-side and client-side limits so house occupancy cannot exceed cycle birds placed or cage capacity.
+- [x] Test allocation validation and save the release checkpoint.
+- [x] Define dependency-aware safeguards for editing and deleting farms, cycles, and houses.
+- [x] Add protected backend procedures to update and delete farm, cycle, and house records.
+- [x] Build Arabic RTL edit dialogs and explicit delete confirmation flows for farm records.
+- [x] Test update and deletion safeguards, then save the release checkpoint.
+- [x] Diagnose why total house allocation can exceed birds placed in a production cycle.
+- [x] Enforce a single aggregate allocation limit across all houses for every cycle update.
+- [x] Show the correct allocated and remaining cycle birds in the allocation interface.
+- [x] Add regression coverage for aggregate allocation updates and save the corrected release checkpoint.
+- [x] Diagnose the dashboard flock-age calculation and selected cycle-day mismatch.
+- [x] Use a timezone-safe production-cycle day calculation for the dashboard age and weather-day selection.
+- [x] Add regression tests for placement day, future dates, and selected cycle-day age synchronization.
+- [x] Verify the dashboard age correction and save the release checkpoint.
+- [x] Research evidence-based broiler feed and water consumption assumptions by production day.
+- [x] Add transparent per-bird, per-day feed and water forecast calculations with configurable bag weight.
+- [x] Allocate forecasts to each house from its actual cycle occupancy and synchronize them to the selected cycle day.
+- [x] Build Arabic dashboard cards showing feed kilograms, feed bags, and water litres with forecast context and limitations.
+- [x] Add calculation tests and save the forecast release checkpoint.
+- [x] Define house-level assignment rules for cycles, birds, operations, health, weights, and forecasts.
+- [x] Add protected backend support for house-scoped records and cycle-to-house assignments.
+- [x] Require an existing farm house when recording daily operations, health events, and weight samples.
+- [x] Show every selected-cycle house with occupancy, operational metrics, and forecast state on farm and dashboard views.
+- [x] Test house-scoped integrity and save the release checkpoint.
+- [x] Add house names and per-house grouping to operations, health, and growth records and summaries.
+- [x] Add regression coverage for required house assignment, house-scoped record creation, and assigned-house-only cage distribution.
+- [x] Verify the complete house-scoped workflow and save the release checkpoint.
+- [x] Add service-level regression coverage for assigned and unassigned house operational record writes.
+- [x] Add service-level regression coverage for rejecting cage distribution before house assignment and above assignment limits.
+- [x] Verify the assignment-to-record-to-grouped-view workflow in preview with a user-authorized temporary operational record, then save the release checkpoint.
+- [x] Audit duplicate or unintended house records in the active farm against the confirmed three-house list.
+- [x] Remove or deactivate unintended houses only when they have no linked cycle assignments or operational data.
+- [x] Verify farm assignment controls show only العنبر الكبير، الحضانة، وقبلي, then save the release checkpoint.
+- [x] Add a transparent expected average live-weight reference curve synchronized to the selected production-cycle day.
+- [x] Show the expected average weight in the Arabic RTL dashboard and identify it clearly as a planning reference.
+- [x] Add a regression test that combines selected cycle-day age calculation with the expected-weight reference.
+- [x] Verify in preview that changing the selected cycle date updates the displayed expected weight.
+- [x] Save a release checkpoint after completing expected-weight forecast validation.
+- [x] Research and document age-based broiler temperature and relative-humidity reference targets.
+- [x] Add a transparent temperature and humidity target model synchronized to the selected cycle day.
+- [x] Show the environmental targets directly below the synchronized weather panel in the Arabic RTL dashboard.
+- [x] Add tests for age synchronization and validate selected-day updates in preview.
+- [x] Save the release checkpoint for the synchronized environmental-target update.
+- [x] Define an export dataset combining recorded house-level weights with the selected-day temperature and humidity context.
+- [x] Add Arabic RTL controls to download the operational dataset as CSV and a printable PDF report.
+- [x] Add export-generation tests and verify the CSV download in the browser.
+- [x] Add a verifiable in-page RTL report preview for the PDF export and test its content in preview.
+- [x] Verify that the PDF export control opens the in-page report preview reliably from the dashboard before native printing.
+- [x] Verify the in-page PDF preview opens from a standard dashboard button click without console interaction.
+- [x] Save the release checkpoint for the weight and environmental export update.
+- [x] Link cage-row configuration to houses assigned in the active production cycle.
+- [x] Add a per-house cage-row form that captures row name, cage count, and birds per cage with capacity safeguards.
+- [x] Show each configured cage row and its cycle occupancy in the housing workspace.
+- [x] Add age-synchronized per-row feed forecasts on the dashboard in kilograms, buckets, and bags using four buckets per bag.
+- [x] Add cage-row and bucket-conversion regression coverage and verify the unconfigured-row workflow in preview.
+- [x] Save the release checkpoint for the cycle-linked cage-row and bucket forecast update.
+- [x] Research and document evidence-based broiler management guidance by production age.
+- [x] Add a transparent Arabic daily-management tip model synchronized to the selected cycle day.
+- [x] Show a professional daily guidance card on the dashboard with operational context and source attribution.
+- [x] Add tests for age synchronization and verify selected-day tip updates in preview.
+- [x] Save the release checkpoint for the synchronized daily-guidance update.
+- [x] Research and document battery-cage broiler management checks appropriate to daily age-synchronized guidance.
+- [x] Replace floor-housing daily advice with battery-cage guidance for cage rows, feed and water lines, ventilation, manure removal, and cage-level observation.
+- [x] Add regression coverage and validate selected-day battery-cage guidance in preview.
+- [x] Save the release checkpoint for the battery-cage daily-guidance update.
+- [x] Research and document a veterinarian-configurable reference list of broiler vaccines used in Egypt, with explicit local-program caveats.
+- [x] Redesign the Arabic RTL health and vaccination workspace with professional treatment and vaccination workflow states.
+- [x] Add a health-event type selector and show vaccine selection only for vaccination records.
+- [x] Add protected edit and delete actions for house-scoped health and vaccination records.
+- [x] Add service-level tests that execute authorized health-record update/delete persistence callbacks against realistic records.
+- [x] Add service-level authorization-failure tests for a record’s source house and a changed destination house.
+- [x] Verify a real edit and delete mutation end-to-end using a user-approved disposable health record.
+- [x] Save the release checkpoint for the professional health and vaccination update.
+- [x] Set a core broiler vaccine as the default for new vaccination records while retaining the veterinarian-defined option for existing custom records.
+- [x] Define feed inventory fields, bag-weight conversion, stock thresholds, and forecast-based days-of-cover rules.
+- [x] Add protected farm-scoped feed inventory and replenishment transactions with role-aware controls.
+- [x] Add a professional Arabic RTL feed stock workspace showing current bags, inbound quantity, reorder threshold, and stock history.
+- [x] Add dashboard reorder alerts driven by the selected-cycle feed forecast and current farm stock.
+- [x] Add inventory and alert regression coverage, validate stock states in preview, and save the release checkpoint.
+- [x] Add an explicit inbound feed-receipt summary and Arabic success/error feedback for inventory settings and stock movement mutations.
+- [x] Extend automated stock-state verification for setup, healthy, reorder, and critical alert scenarios while preserving the empty-first live workspace.
+- [x] Verify the dashboard stock alert and inventory workspace, then save the feed inventory release checkpoint.
+- [x] Save the verified feed inventory release checkpoint and publish the completed workflow.
+- [x] Define farm-scoped expense fields, categories, Arabic labels, and cycle-linking rules for operational cost records.
+- [x] Add the expenses database schema, migration, protected role-aware services, and tRPC procedures for creating and viewing actual expense records.
+- [x] Build a professional Arabic RTL expenses page with summary metrics, category analysis, chronological ledger, filters, and an empty-first add-expense dialog.
+- [x] Add the expenses navigation entry and page metadata, then connect the active farm and cycle context to the workspace.
+- [x] Add regression coverage for expense validation and access controls; verify the empty-first workspace; run checks; and publish the expenses release.
+- [x] Add explicit protected expense-contract regression coverage for role capability and farm/cycle ownership validation.
+- [x] Save and publish the verified expenses release checkpoint after final regression testing.
+- [x] Define trader accounts, sales invoices, payments, weight/cage/tare calculations, and cycle-profitability rules with exact Egyptian-pound accounting.
+- [x] Add database schema, migration, protected role-aware services, and tRPC procedures for traders, sales, and payment settlement records.
+- [x] Build the Arabic RTL sales workspace with trader creation, invoice entry, live gross/net-weight and total calculations, received payments, and remaining balances.
+- [x] Show actual sales totals, outstanding trader balances, cycle expenses, and net profit from the selected cycle without creating demo transactions.
+- [x] Add a printable Arabic RTL cycle-settlement PDF report covering outstanding traders, sales total, cycle expenses, and net profit.
+- [x] Add sales navigation and metadata, regression tests for calculations and protected settlement rules, and browser validation.
+- [x] Save and publish the verified sales release checkpoint.
+- [x] Edit the user-approved Newcastle vaccination record in عنبر الكبير and confirm the updated record is visible.
+- [x] Permanently delete the user-approved edited Newcastle vaccination record and verify its removal.
+- [x] Save the verified health-record lifecycle checkpoint.
+- [x] Create the user-authorized temporary house-scoped operational reading for عنبر الكبير using disclosed verification values.
+- [x] Verify the reading appears in the house-grouped operations view.
+- [x] Save the verified house-scoped operations checkpoint.
+- [x] Fix the trader-account dialog submission error caused by resetting the form after its modal has closed.
+- [x] Add regression coverage and mobile browser verification for successful trader-account creation.
+- [x] Save and publish the verified trader-account submission fix.
+- [x] Define a trader-first sales workflow with dedicated account pages, active settlement context, and sequential cage-weighing batches.
+- [x] Add protected batch-weight records that capture the sequence, cages per batch, measured batch weight, and cumulative sale totals.
+- [x] Build an Arabic RTL trader list that opens a detailed trader account page with contact data, balance, sales history, and weigh-in controls.
+- [x] Build a rapid batch weigh-in flow for 5-cage (or configurable) batches, with automatic count, weight, cage tare, price, and total calculations.
+- [x] Preserve trader payment and outstanding-balance workflows while adapting cycle sales and PDF settlement reporting to batch totals.
+- [x] Add calculations and authorization regression tests and validate the trader account flow on mobile.
+- [x] Save and publish the verified trader-led batch sales release checkpoint.
+- [x] Replace the low-contrast sales hero and KPI treatment with a mobile-safe palette that keeps all Arabic text and totals legible.
+- [x] Define trader company data, sale weight modes, planned birds-per-cage, discounts, payment methods, activity history, and sale completion rules.
+- [x] Add protected schema, services, and tRPC lifecycle procedures to create, edit, delete, and reorder batch weights while recalculating sale totals atomically.
+- [x] Build a searchable/filterable trader sales list that shows trader contact/company data, cages, birds, weights, average weight, sale total, status, and sale date.
+- [x] Build a detailed trader-sale dashboard with header actions, KPI cards, progress, rapid reusable weight entry, editable weight table, financial summary, payment controls, and activity log.
+- [x] Support fixed, variable, and direct-weight modes with strict remaining-cage rules and a clear confirmation path for any exceptional overage.
+- [x] Add settlement status, discounts, payment method and notes, invoice export, and safe completion/delete workflows with role-aware controls.
+- [x] Add calculation and protected-lifecycle regression tests and validate desktop and mobile contrast and workflows without artificial sales data.
+- [x] Save and publish the corrected trader sales lifecycle and contrast release.
+- [x] Implement a protected exceptional-overage confirmation flow with explicit user-facing guidance and manager-only approval.
+- [x] Add direct regression coverage for batch edit/delete/reorder, sale completion, soft deletion, and sale-details recalculation paths.
+- [x] Verify detailed lifecycle controls using a user-approved disposable sale workflow or obtain guidance before creating any financial records.
+- [x] Create a user-approved disposable trader sale and verify batch addition, edit, reorder, deletion, payment, and completion controls.
+- [x] Soft-delete the user-approved disposable sale, verify it is removed from active trader workflows, and publish the completed sales release.
+- [x] إعادة ضبط صفحة المبيعات الرئيسية لتعرض قائمة تجار بسيطة وبطاقات بيع واضحة بدلاً من لوحة معقدة.
+- [x] تبسيط نموذج إضافة التاجر ليجمع اسم التاجر والهاتف وإجمالي الأقفاص وسعر الكيلو والملاحظات ثم ينشئ عملية البيع المرتبطة فعلياً.
+- [x] إعادة بناء صفحة التاجر حول إدخال وزن الدفعات فقط: عدد الأقفاص ووزن الدفعة، مع إجماليات محسوبة تلقائياً.
+- [x] إبقاء تعديل وحذف دفعات الوزن وتحديث إجمالي الأقفاص والوزن ومتوسط القفص وقيمة البيع من قاعدة البيانات.
+- [x] اختبار سيناريو 200 قفص وثلاث دفعات وزن والتأكد من الاستمرارية بعد الرجوع إلى صفحة التاجر.
+- [x] مراجعة الواجهة العربية RTL على سطح المكتب والهاتف وحفظ إصدار منشور بعد التحقق.
+- [x] تحديد طريقة إدخال وزن الفارغ لكل دفعة وحساب الوزن الصافي تلقائياً.
+- [x] تحديث خدمة حفظ وتعديل دفعات الوزن لحساب الوزن المملوء ووزن الفارغ والوزن الصافي وقيمة البيع بدقة.
+- [x] إظهار حقول وزن الفارغ والوزن الصافي داخل إدخال الدفعة وجدول أوزان التاجر.
+- [x] إضافة اختبارات تحقق خصم الفارغ ومراجعة الحسابات في المتصفح ثم نشر الإصدار.
+- [x] إعادة تصميم دفعة الوزن لتسجيل وزن الفارغ أولاً كسجل مستقل، ثم ربط وزن المملوء به لاحقاً لحساب الصافي تلقائياً.
+- [x] إضافة حماية لخدمات إنشاء وتعديل وحذف مراحل وزن الفارغ والمملوء مع إعادة حساب إجمالي البيع من الوزن الصافي فقط.
+- [x] إضافة تعديل وحذف التاجر من قائمة التجار وحساب التاجر مع حماية السجلات المرتبطة.
+- [x] إضافة سجل رصيد/دفعات للتاجر مع إنشاء وتعديل وحذف الحركة وإعادة حساب المتبقي وحالة التسوية.
+- [x] توفير واجهة عربية مبسطة لإدارة مراحل الوزن والتاجر والرصيد، ثم اختبار دورة كاملة ونشر الإصدار.
+- [x] إزالة إدخال إجمالي الأقفاص المخطط من إنشاء حساب التاجر وعملية البيع.
+- [x] فصل سجل الفارغ عن سجل المملوء بحيث يجمع كل سجل أوزانه بصورة مستقلة دون ربط دفعة الفارغ بدفعة مملوء بعينها.
+- [x] حساب إجمالي الفارغ وإجمالي المملوء والوزن الصافي وقيمة البيع تلقائياً عند اكتمال الإدخال.
+- [x] إعادة تصميم صفحة التاجر لتعرض سجل الفارغ وسجل المملوء المنفصلين وملخص التجميع النهائي.
+- [x] اختبار الحسابات دون عدد أقفاص مخطط ومراجعة الواجهة ثم نشر الإصدار.
+- [x] إضافة زر صريح لحساب قيمة البيع من إجمالي المملوء وإجمالي الفارغ والوزن الصافي وسعر الكيلو.
+- [x] إضافة إنهاء بيع محمي مع تثبيت الحالة المالية بعد مراجعة الحساب.
+- [x] إضافة إعادة فتح البيع للتعديل وإعادة الحساب عند إضافة وزن أو تعديل سجل بعد الإنهاء.
+- [x] اختبار الحساب والإنهاء وإعادة الفتح في الواجهة مع اختبارات انحدار ثم نشر الإصدار.
+- [x] إضافة إجراء «إنهاء البيع بالكامل» في صفحة المبيعات مع التحقق من حساب القيمة قبل تثبيت البيع.
+- [x] إضافة إجراء «إنهاء الدورة» من صفحة المبيعات بعد مراجعة أو إنهاء مبيعات الدورة وفق ضوابط الصلاحيات.
+- [x] توفير إنشاء تقرير تسوية المبيعات وتقرير دورة ختامي قابل للطباعة من مسار الإنهاء.
+- [x] إضافة اختبارات وإجراء مراجعة بصرية لمسار الإغلاق والتقارير قبل النشر.
+- [x] تدقيق سبب ظهور ثلاث عمليات بيع في ملخص الإقفال مع وجود تاجر واحد ظاهر فقط.
+- [x] استبعاد عمليات البيع المحذوفة أو المرتبطة بتاجر غير نشط أو غير ظاهرة في الدورة من الملخص والتقارير والإقفال.
+- [x] إضافة اختبار انحدار يؤكد تطابق عدد عمليات الملخص مع عمليات التاجر الفعلية الظاهرة.
+- [x] التحقق من أرقام ملخص الإقفال في الواجهة دون تغيير السجلات المالية ثم نشر التصحيح.
+- [x] حصر البيانات الحالية وتوثيق خطة بيانات تجريبية متسقة لدورة تسمين مكتملة.
+- [x] حذف جميع بيانات المزارع والدورات والسجلات التشغيلية والمالية الحالية وفق موافقة المستخدم الصريحة.
+- [x] إنشاء مزرعة تجريبية، عنابر وبطاريات، ودورة مكتملة وربطها ببيانات التشغيل والصحة والأوزان والعلف والمصاريف.
+- [x] إنشاء تجار ومبيعات ودفعات فارغ/مملوء ومدفوعات تجريبية وإقفال البيع والدورة وتوليد التقارير.
+- [x] اختبار جميع وحدات التطبيق وإصلاح الأخطاء التي تظهر في البيانات أو الواجهة.
+- [x] إعداد مقترحات قابلة للتنفيذ لتحسين سهولة الاستخدام واحترافية النظام ثم نشر الإصدار المتحقق.
+- [x] حصر تبعيات المزرعة والدورة والعنبر وتحديد ترتيب الحذف المتسلسل الآمن.
+- [x] إضافة إجراءات خادم للحذف المتسلسل للمزرعة والدورة والعنبر وكل البيانات المرتبطة بها.
+- [x] إضافة معاينة أثر الحذف في الواجهة قبل التأكيد تعرض أعداد السجلات التابعة التي ستُحذف.
+- [x] اختبار الحذف المتسلسل ببيانات اختبار مع ضمان عدم حذف السجلات المستقلة ثم نشر الإصدار.
+- [x] إضافة خيار «جميع عنابر الدورة» عند تسجيل علاج أو تحصين مع إنشاء سجلات منفصلة لكل عنبر مؤهل.
+- [x] التحقق من أن جميع العنابر المختارة مرتبطة بالدورة النشطة قبل الحفظ الجماعي.
+- [x] إعادة تنظيم سجل الصحة والتحصينات حسب عمر الطائر باليوم مع تمييز واضح بين العلاج والتحصين.
+- [x] اختبار التسجيل الجماعي وترتيب السجل على بيانات تجريبية ثم نشر الإصدار.
+- [x] تحديد تحصينات وعلاجات تجريبية مرجعية موزعة على أيام عمر الدورة مع تنبيه اعتماد الطبيب البيطري.
+- [x] إضافة سجلات التحصين والعلاج التجريبية لجميع عنابر الدورة الحالية.
+- [x] مراجعة صفحة الصحة للتحقق من ظهور السجلات بترتيب العمر والنوع لجميع العنابر.
+- [x] التحقق من اتساق السجلات التجريبية ثم حفظ الإصدار المنشور.
+- [x] إضافة زر «حساب الجرعة» أعلى صفحة الصحة والتحصينات.
+- [x] إضافة نافذة تطلب كمية الدواء والجرعة المطلوبة وعدد الأيام مع تحقق القيم.
+- [x] حساب الكمية اليومية وتوزيعها بالتساوي على عنابر الدورة وعرض حصة كل عنبر.
+- [x] إضافة اختبارات ومراجعة واجهة الحاسبة دون إنشاء وصفة أو سجل علاجي ثم نشر الإصدار.
+- [x] تعديل الحاسبة ليكون إدخال الجرعة الكلية بدلاً من الجرعة اليومية.
+- [x] حساب الجرعة اليومية بقسمة الجرعة الكلية على عدد الأيام وتوزيع الناتج بالتساوي على العنابر.
+- [x] تحديث اختبار المعادلة والواجهة ثم نشر التصحيح.
+- [x] إزالة حقل الجرعة الكلية المطلوبة للقطيع من الحاسبة.
+- [x] استخدام كمية الدواء المتاحة مباشرة كإجمالي الجرعة لتوزيعها على الأيام والعنابر.
+- [x] تحديث الاختبارات والواجهة والتحقق من التوزيع المبسط ثم نشر الإصدار.
+- [x] ربط حاسبة الجرعة بأعداد الكتاكيت الفعلية في عنابر الدورة.
+- [x] توزيع الجرعة اليومية بنسبة عدد كتاكيت كل عنبر من إجمالي الطيور بدلاً من التوزيع المتساوي.
+- [x] إظهار عدد الكتاكيت ونسبة العنبر وحصته اليومية وطوال المدة في الحاسبة.
+- [x] اختبار التوزيع النسبي في الواجهة ثم نشر الإصدار.
+- [x] حصر الدورة التجريبية وأعداد كتاكيت العنابر وسجلات التشغيل الحالية قبل إعادة البناء.
+- [x] إعادة إنشاء سجلات تشغيل يومية توزع 81,000 كجم علف على أيام الدورة والعنابر بنسبة أعداد الكتاكيت.
+- [x] توزيع نفوق إجمالي 6% من القطيع على أيام الدورة والعنابر مع الحفاظ على إجمالي صحيح.
+- [x] التحقق من إجماليات العلف والنفوق والمؤشرات في قاعدة البيانات والواجهة ثم نشر الإصدار.
+- [x] إظهار إجمالي النفوق المسجل في بطاقات العمليات اليومية لكل عنبر لتسهيل مراجعة التوزيع.
+- [x] مراجعة بنية العمليات اليومية وحركات مخزون العلف وتحديد مرجع يمنع الخصم المزدوج.
+- [x] إنشاء خصم مخزون تلقائي عند إضافة سجل تشغيل يحتوي استهلاك علف.
+- [x] مزامنة فرق العلف عند تعديل السجل وإرجاع الكمية عند حذفه.
+- [x] إنشاء حركات مخزون متسقة للاستهلاك التجريبي الحالي البالغ 81,000 كجم.
+- [x] اختبار أرصدة المخزون في الإضافة والتعديل والحذف ومراجعة وحدة مخزون العلف ثم نشر الإصدار.
+- [x] مراجعة بنية المصاريف الحالية وتحديد ضوابط تعديل المصروف وربطه بالمزرعة والدورة.
+- [x] إضافة خدمة وإجراء محميين لتعديل بيانات المصروف مع التحقق من الصلاحيات والملكية.
+- [x] إضافة نموذج تعديل عربي RTL وأزرار تعديل في سجل المصاريف.
+- [x] اختبار تعديل المصروف والتحقق من تحديث ملخصات المصاريف في الواجهة ثم نشر الإصدار.
+- [x] تصميم حسابات العمال والسلف والمسحوبات كدفتر مستقل لا يدخل في إجمالي مصاريف المزرعة.
+- [x] إضافة جداول وخدمات محمية لإنشاء العمال وتعديلهم وإدارة حركات السحب وسجل الرواتب.
+- [x] بناء صفحة عربية RTL لحسابات العمال تعرض الراتب والمسحوب والمتبقي وسجل الحركات.
+- [x] اختبار أرصدة العمال وفصلها عن المصاريف والتحقق من الواجهة ثم نشر الإصدار.
+- [x] اختبار الصفحة الرئيسية وتوثيق توصيات عملية لتحسين سهولة الاستخدام واحترافية النظام.
+- [x] إضافة شريط استثناءات اليوم بإجراءات مباشرة للعلف والوزن والبيئة.
+- [x] تحويل فجوات الوزن وFCR إلى إجراءات واضحة لتسجيل عينة وزن.
+- [x] توضيح نطاق تغطية توقعات صفوف الأقفاص مقارنة بإجمالي العنبر.
+- [x] تحسين الوصول إلى تسجيل اليوم والوزن والمخزون على الهاتف ثم اختبار ونشر الصفحة الرئيسية.
+- [x] ضغط قائمة الهاتف وإتاحة تمرير التنقل حتى تظهر جميع صفحات النظام فوق بطاقة المستخدم.
+- [x] اختبار صفحات النظام الأخرى صفحةً صفحة وتوثيق التحميل والتنقل والإجراءات والملاحظات ذات الأولوية.
+- [x] إضافة فلاتر سريعة لسجل الصحة والتحصين حسب العنبر واليوم ونوع الحدث ثم اختبارها ونشرها.
+- [x] استكشاف النظام وتوثيق خريطة الكيانات والبيانات والقيود قبل محاكاة دورة اختبارية.
+- [x] إنشاء بيئة اختبار معزولة باسم TEST FARM — BroilFarm QA ودورة واقعية تضم ثلاثة عنابر و10,000 طائر.
+- [x] محاكاة عمليات الدورة والعلف والوزن والصحة والمصاريف والمبيعات ثم اختبار الحسابات والإقفال.
+- [x] تدقيق التقارير والصلاحيات والحالات الطرفية وعزل البيانات وتجربة الهاتف والأداء.
+- [x] إصلاح المشكلات الآمنة وإعادة الاختبار وإصدار تقرير BroilFarm Production Readiness Assessment.
+- [ ] تجهيز أرشيف مصدر نظيف لآخر إصدار واستبعاد الأسرار والاعتماديات القابلة لإعادة البناء.
+- [ ] إعداد دليل عربي لتشغيل النظام ونشره مجاناً مع توضيح متطلبات قاعدة البيانات وتسجيل الدخول.
+- [ ] التحقق من محتويات حزمة المصدر وتسليمها مع خيارات الاستضافة المناسبة.

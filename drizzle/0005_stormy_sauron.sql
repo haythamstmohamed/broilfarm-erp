@@ -1,0 +1,2 @@
+DROP INDEX `occupancy_cycle_section_idx` ON `cycleCageOccupancy`;--> statement-breakpoint
+ALTER TABLE `cycleCageOccupancy` ADD CONSTRAINT `occupancy_cycle_section_unique` UNIQUE(`cycleId`,`cageSectionId`);
