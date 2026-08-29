@@ -3,34 +3,38 @@ import express from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "../server/routers";
 import { createContext } from "../server/_core/context";
-import { registerOAuthRoutes } from "../server/_core/oauth";
-import { registerStorageProxy } from "../server/_core/storageProxy";
 
 const app = express();
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-registerStorageProxy(app);
-registerOAuthRoutes(app);
-
-// Support all URL prefix variants on Vercel (/api/trpc, /trpc, /)
-app.use(
-  ["/api/trpc", "/trpc", "/"],
-  createExpressMiddleware({
+// tRPC request normalization middleware for Vercel
+app.use((req, res, next) => {
+  if (req.url.startsWith("/api/trpc")) {
+    req.url = req.url.replace(/^\/api\/trpc/, "");
+  } else if (req.url.startsWith("/trpc")) {
+    req.url = req.url.replace(/^\/trpc/, "");
+  }
+  if (!req.url.startsWith("/")) {
+    req.url = "/" + req.url;
+  }
+  return createExpressMiddleware({
     router: appRouter,
     createContext,
-  })
-);
-
-// Fallback JSON for any unmatched API route
-app.use("/api", (req, res) => {
-  res.status(404).json({ error: "API route not found" });
+  })(req, res, next);
 });
 
-// Error handling middleware to always return JSON
+// JSON fallback for any unhandled routes
+app.use((req, res) => {
+  res.status(404).json({ error: "Endpoint not found" });
+});
+
+// JSON error handler
 app.use((err: any, req: any, res: any, next: any) => {
-  console.error("[Vercel API Error]:", err);
+  console.error("[Vercel Handler Error]:", err);
   res.status(500).json({ error: err.message || "Internal Server Error" });
 });
 
-export default app;
+export default function handler(req: any, res: any) {
+  return app(req, res);
+}
