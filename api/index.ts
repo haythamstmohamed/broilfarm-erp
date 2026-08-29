@@ -13,12 +13,24 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 registerStorageProxy(app);
 registerOAuthRoutes(app);
 
+// Support both /api/trpc and /trpc mount points for Vercel rewrites
 app.use(
-  "/api/trpc",
+  ["/api/trpc", "/trpc"],
   createExpressMiddleware({
     router: appRouter,
     createContext,
   })
 );
+
+// Fallback JSON for any unmatched API route
+app.use("/api", (req, res) => {
+  res.status(404).json({ error: "API route not found" });
+});
+
+// Error handling middleware to always return JSON
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("[Vercel API Error]:", err);
+  res.status(500).json({ error: err.message || "Internal Server Error" });
+});
 
 export default app;
