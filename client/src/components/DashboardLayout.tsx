@@ -1,14 +1,14 @@
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { Activity, Bird, Building2, ChevronLeft, CircleDollarSign, ClipboardPlus, Drumstick, FileBarChart2, HandCoins, HeartPulse, LayoutDashboard, LogOut, Scale, ShieldCheck, Warehouse, WalletCards } from "lucide-react";
-import { useEffect } from "react";
-import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
+import AuthModal from "./AuthModal";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "لوحة المتابعة", path: "/" },
@@ -27,9 +27,41 @@ const menuItems = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { loading, user } = useAuth();
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+
   if (loading) return <DashboardLayoutSkeleton />;
   if (!user) {
-    return <div dir="rtl" className="page-grid flex min-h-screen items-center justify-center p-5"><div className="soft-card w-full max-w-md overflow-hidden p-8 text-center"><div className="mx-auto mb-7 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20"><Drumstick className="h-8 w-8" /></div><div className="flex flex-col items-center gap-3"><p className="text-sm font-bold text-primary">مزارع</p><h1 className="text-2xl font-extrabold tracking-tight">إدارة دقيقة لدورات التسمين</h1><p className="text-sm leading-7 text-muted-foreground">سجّل الدخول للوصول إلى مزارعك ودوراتك وسجل المتابعة اليومي.</p></div><Button onClick={() => startLogin()} size="lg" className="mt-8 w-full bg-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary/90">تسجيل الدخول إلى النظام</Button></div></div>;
+    return (
+      <div dir="rtl" className="page-grid flex min-h-screen items-center justify-center p-5 bg-muted/20">
+        <div className="soft-card w-full max-w-md overflow-hidden p-8 text-center bg-card border rounded-2xl shadow-xl">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+            <Drumstick className="h-8 w-8" />
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-xs font-bold text-primary tracking-wider uppercase">BroilFarm Enterprise ERP</p>
+            <h1 className="text-2xl font-extrabold tracking-tight">إدارة دقيقة لمزارع التسمين</h1>
+            <p className="text-xs leading-6 text-muted-foreground mt-1">
+              منظومة متكاملة لإدارة دورات التسمين بنظام البطاريات، ومراقبة العنابر والنمو والمخازن والماليات.
+            </p>
+          </div>
+          <Button
+            onClick={() => setIsAuthOpen(true)}
+            size="lg"
+            className="mt-7 w-full bg-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 font-bold"
+          >
+            تسجيل الدخول / إنشاء حساب مؤسسة
+          </Button>
+
+          <AuthModal
+            open={isAuthOpen}
+            onOpenChange={setIsAuthOpen}
+            onSuccess={() => {
+              window.location.reload();
+            }}
+          />
+        </div>
+      </div>
+    );
   }
   return <SidebarProvider><DashboardLayoutContent>{children}</DashboardLayoutContent></SidebarProvider>;
 }
