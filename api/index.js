@@ -4644,11 +4644,16 @@ async function createContext(opts) {
 // server/api.ts
 async function handler(req, res) {
   try {
+    const origin = req.headers?.origin || req.headers?.Origin || "";
     if (res.setHeader) {
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-trpc-source");
-      res.setHeader("Access-Control-Allow-Credentials", "true");
+      if (origin) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+      } else {
+        res.setHeader("Access-Control-Allow-Origin", "*");
+      }
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-trpc-source, trpc-batch-mode");
     }
     if (req.method === "OPTIONS") {
       res.statusCode = 204;

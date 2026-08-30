@@ -76,9 +76,26 @@ const trpcClient = trpc.createClient({
           }
 
           return res;
-        } catch (err) {
+        } catch (err: any) {
           console.error("[Fetch Network Error]:", err);
-          throw err;
+          const networkErrorPayload = JSON.stringify([
+            {
+              error: {
+                json: {
+                  message: "تعذر الاتصال بالخادم السحابي. يرجى التحقق من اتصال الإنترنت أو إعدادات قاعدة البيانات.",
+                  code: -32603,
+                  data: {
+                    code: "INTERNAL_SERVER_ERROR",
+                    httpStatus: 0,
+                  },
+                },
+              },
+            },
+          ]);
+          return new Response(networkErrorPayload, {
+            status: 503,
+            headers: { "content-type": "application/json" },
+          });
         }
       },
     }),

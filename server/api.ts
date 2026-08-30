@@ -5,12 +5,17 @@ import { createContext } from "./_core/context";
 
 export default async function handler(req: any, res: any) {
   try {
-    // 1. CORS Headers
+    // 1. Dynamic W3C Compliant CORS Headers (echo origin for credentials: "include")
+    const origin = req.headers?.origin || req.headers?.Origin || "";
     if (res.setHeader) {
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-trpc-source");
-      res.setHeader("Access-Control-Allow-Credentials", "true");
+      if (origin) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+      } else {
+        res.setHeader("Access-Control-Allow-Origin", "*");
+      }
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-trpc-source, trpc-batch-mode");
     }
 
     if (req.method === "OPTIONS") {
