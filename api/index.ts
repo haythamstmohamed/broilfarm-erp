@@ -48,15 +48,35 @@ app.use((req, res, next) => {
   return trpcMiddleware(req, res, next);
 });
 
-// JSON fallback for any unhandled routes
+// SuperJSON-compatible fallback for unhandled routes
 app.use((req, res) => {
-  res.status(404).json({ error: "Endpoint not found", path: req.url });
+  res.status(404).json([
+    {
+      error: {
+        json: {
+          message: `المسار غير موجود (${req.url})`,
+          code: -32004,
+          data: { code: "NOT_FOUND", httpStatus: 404 },
+        },
+      },
+    },
+  ]);
 });
 
-// JSON error handler
+// SuperJSON-compatible error handler
 app.use((err: any, req: any, res: any, next: any) => {
   console.error("[Vercel Handler Error]:", err);
-  res.status(500).json({ error: err?.message || "Internal Server Error" });
+  res.status(500).json([
+    {
+      error: {
+        json: {
+          message: err?.message || "حدث خطأ غير متوقع في الخادم",
+          code: -32603,
+          data: { code: "INTERNAL_SERVER_ERROR", httpStatus: 500 },
+        },
+      },
+    },
+  ]);
 });
 
 export default function handler(req: any, res: any) {

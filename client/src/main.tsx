@@ -27,21 +27,49 @@ const trpcClient = trpc.createClient({
             credentials: "include",
           });
 
-          // If the server returned an HTML/text error (e.g. 500 or Vercel edge crash) instead of JSON:
-          const contentType = res.headers.get("content-type") || "";
-          if (!res.ok && !contentType.includes("application/json")) {
+          // Check if response is not OK (e.g. 404, 500, 502)
+          if (!res.ok) {
             const rawText = await res.text();
-            console.error("[Server Error Intercepted]:", res.status, rawText);
-            const fallbackBody = JSON.stringify([
+            let errorMessage = `خطأ في الخادم (${res.status}): يرجى التأكد من ضبط DATABASE_URL في متغيرات البيئة.`;
+
+            try {
+              const parsed = JSON.parse(rawText);
+              // If it's already a valid tRPC SuperJSON error format, return it
+              if (Array.isArray(parsed) && parsed[0]?.error?.json) {
+                return new Response(rawText, {
+                  status: res.status,
+                  headers: { "content-type": "application/json" },
+                });
+              }
+              if (parsed?.error) {
+                errorMessage = typeof parsed.error === "string" ? parsed.error : parsed.error.message || JSON.stringify(parsed.error);
+              } else if (parsed?.message) {
+                errorMessage = parsed.message;
+              }
+            } catch {
+              if (rawText && rawText.length > 0 && rawText.length < 200) {
+                errorMessage = rawText;
+              }
+            }
+
+            console.error("[tRPC Intercepted Non-tRPC Error]:", res.status, errorMessage);
+
+            const superjsonPayload = JSON.stringify([
               {
                 error: {
-                  message: `خطأ في الخادم (${res.status}): يرجى التأكد من ضبط DATABASE_URL في متغيرات البيئة.`,
-                  code: -32603,
-                  data: { code: "INTERNAL_SERVER_ERROR", httpStatus: res.status },
+                  json: {
+                    message: errorMessage,
+                    code: -32603,
+                    data: {
+                      code: "INTERNAL_SERVER_ERROR",
+                      httpStatus: res.status,
+                    },
+                  },
                 },
               },
             ]);
-            return new Response(fallbackBody, {
+
+            return new Response(superjsonPayload, {
               status: res.status,
               headers: { "content-type": "application/json" },
             });
