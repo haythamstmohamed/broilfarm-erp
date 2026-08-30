@@ -31,12 +31,14 @@ export function validateCriticalEnv(): void {
 
   if (errors.length > 0) {
     console.error("\n╔══════════════════════════════════════════════╗");
-    console.error("║  ⚠️  خطأ حرج في إعدادات البيئة (ENV)          ║");
+    console.error("║  ⚠️  خطأ في إعدادات البيئة (ENV)              ║");
     console.error("╚══════════════════════════════════════════════╝");
     for (const error of errors) {
       console.error(`  ❌ ${error}`);
     }
     console.error("");
-    process.exit(1);
+    if (process.env.NODE_ENV === "production" && !process.env.VERCEL) {
+      throw new Error(`CRITICAL_ENV_ERROR: ${errors.join(" | ")}`);
+    }
   }
 }

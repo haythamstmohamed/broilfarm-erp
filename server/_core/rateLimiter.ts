@@ -6,19 +6,13 @@ interface RateLimitRecord {
 
 class InMemoryRateLimiter {
   private hits = new Map<string, RateLimitRecord>();
-  private cleanupInterval: NodeJS.Timeout;
+  private lastCleanup = Date.now();
 
   constructor(
     private readonly windowMs: number,
     private readonly maxRequests: number,
     private readonly message: string = "تم تجاوز الحد المسموح به من الطلبات. يرجى المحاولة بعد قليل."
-  ) {
-    // Periodically clean expired records every 5 minutes
-    this.cleanupInterval = setInterval(() => this.cleanup(), 5 * 60 * 1000);
-    if (this.cleanupInterval.unref) {
-      this.cleanupInterval.unref();
-    }
-  }
+  ) {}
 
   private cleanup(): void {
     const now = Date.now();
@@ -41,8 +35,12 @@ class InMemoryRateLimiter {
 
   middleware() {
     return (req: Request, res: Response, next: NextFunction) => {
-      const key = this.getKey(req);
       const now = Date.now();
+      if (now - this.lastCleanup > 5 * 60 * 1000) {
+        this.cleanup();
+        this.lastCleanup = now;
+      }
+      const key = this.getKey(req);
       const threshold = now - this.windowMs;
 
       let record = this.hits.get(key);
