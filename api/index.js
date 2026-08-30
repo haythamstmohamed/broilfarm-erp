@@ -453,8 +453,7 @@ var init_schema = __esm({
 
 // server/api.ts
 import "dotenv/config";
-import express from "express";
-import { createExpressMiddleware } from "@trpc/server/adapters/express";
+import { nodeHTTPRequestHandler } from "@trpc/server/adapters/node-http";
 
 // shared/const.ts
 var COOKIE_NAME = "app_session_id";
@@ -4643,73 +4642,42 @@ async function createContext(opts) {
 }
 
 // server/api.ts
-var app = express();
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
-var trpcMiddleware = createExpressMiddleware({
-  router: appRouter,
-  createContext,
-  onError: ({ error, path }) => {
-    console.error(`[tRPC Error on ${path}]:`, error);
+async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-trpc-source");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  if (req.method === "OPTIONS") {
+    res.statusCode = 204;
+    res.end();
+    return;
   }
-});
-app.get("/api/health", (_req, res) => {
-  res.status(200).json({ status: "ok", timestamp: (/* @__PURE__ */ new Date()).toISOString() });
-});
-app.use((req, res, next) => {
-  let url = req.url || "/";
-  const forwardedUri = req.headers["x-forwarded-uri"] || req.headers["x-matched-path"] || req.originalUrl;
-  if (forwardedUri && forwardedUri.includes("/api/trpc/")) {
-    url = forwardedUri.slice(forwardedUri.indexOf("/api/trpc/") + "/api/trpc".length);
-  } else if (forwardedUri && forwardedUri.includes("/trpc/")) {
-    url = forwardedUri.slice(forwardedUri.indexOf("/trpc/") + "/trpc".length);
-  } else if (req.query?.trpc) {
-    const trpcParam = Array.isArray(req.query.trpc) ? req.query.trpc.join("/") : req.query.trpc;
-    const queryIdx = url.indexOf("?");
-    const search = queryIdx >= 0 ? url.slice(queryIdx) : "";
-    url = `/${trpcParam}${search}`;
+  if (req.url === "/api/health" || req.url === "/health") {
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify({ status: "ok", timestamp: (/* @__PURE__ */ new Date()).toISOString() }));
+    return;
+  }
+  let path = "";
+  if (req.query?.trpc) {
+    path = Array.isArray(req.query.trpc) ? req.query.trpc.join("/") : req.query.trpc;
   } else if (req.query?.path) {
-    const pathParam = Array.isArray(req.query.path) ? req.query.path.join("/") : req.query.path;
-    const queryIdx = url.indexOf("?");
-    const search = queryIdx >= 0 ? url.slice(queryIdx) : "";
-    url = `/${pathParam}${search}`;
-  } else {
-    url = url.replace(/^\/api\/trpc/, "").replace(/^\/trpc/, "").replace(/^\/api/, "");
+    path = Array.isArray(req.query.path) ? req.query.path.join("/") : req.query.path;
+  } else if (req.url) {
+    const cleanUrl = req.url.split("?")[0] || "";
+    path = cleanUrl.replace(/^\/api\/trpc\/?/, "").replace(/^\/trpc\/?/, "").replace(/^\/api\/?/, "");
   }
-  if (!url.startsWith("/")) {
-    url = "/" + url;
-  }
-  req.url = url;
-  return trpcMiddleware(req, res, next);
-});
-app.use((req, res) => {
-  res.status(404).json([
-    {
-      error: {
-        json: {
-          message: `\u0627\u0644\u0645\u0633\u0627\u0631 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F (${req.url})`,
-          code: -32004,
-          data: { code: "NOT_FOUND", httpStatus: 404 }
-        }
-      }
+  return nodeHTTPRequestHandler({
+    req,
+    res,
+    router: appRouter,
+    createContext,
+    path,
+    onError: ({ error, path: errPath }) => {
+      console.error(`[tRPC Error on ${errPath}]:`, error);
     }
-  ]);
-});
-app.use((err, req, res, next) => {
-  console.error("[Vercel Handler Error]:", err);
-  res.status(500).json([
-    {
-      error: {
-        json: {
-          message: err?.message || "\u062D\u062F\u062B \u062E\u0637\u0623 \u063A\u064A\u0631 \u0645\u062A\u0648\u0642\u0639 \u0641\u064A \u0627\u0644\u062E\u0627\u062F\u0645",
-          code: -32603,
-          data: { code: "INTERNAL_SERVER_ERROR", httpStatus: 500 }
-        }
-      }
-    }
-  ]);
-});
-var api_default = app;
+  });
+}
 export {
-  api_default as default
+  handler as default
 };
