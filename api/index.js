@@ -483,8 +483,9 @@ import { z as z2 } from "zod";
 // server/db/connection.ts
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
-var _db = null;
 var _pool = null;
+var createDatabase = (pool) => drizzle(pool);
+var _db = null;
 async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
@@ -499,7 +500,7 @@ async function getDb() {
         idleTimeout: 6e4,
         enableKeepAlive: true
       });
-      _db = drizzle(_pool);
+      _db = createDatabase(_pool);
     } catch (error) {
       console.error("[Database] Connection pool initialization failed:", error);
       _db = null;
@@ -639,7 +640,7 @@ function scopeAllows(granted, requested) {
 // server/db/workspace.ts
 async function getWorkspace(ownerId) {
   const db = await getDb();
-  if (!db) return { farms: [], houses: [], cageSections: [], occupancy: [], cycles: [], records: [], weights: [], health: [], feedInventorySettings: [], feedInventoryTransactions: [], expenses: [], workers: [], workerAccountEntries: [], traders: [], sales: [], salePayments: [], saleWeighBatches: [], saleActivities: [] };
+  if (!db) return { farms: [], houses: [], cageSections: [], assignments: [], occupancy: [], cycles: [], records: [], weights: [], health: [], memberships: [], invitations: [], feedInventorySettings: [], feedInventoryTransactions: [], expenses: [], workers: [], workerAccountEntries: [], traders: [], sales: [], salePayments: [], saleWeighBatches: [], saleActivities: [] };
   const [ownedFarms, memberships] = await Promise.all([
     db.select().from(farms).where(eq2(farms.ownerId, ownerId)).orderBy(desc(farms.createdAt)),
     db.select().from(farmMemberships).where(and(eq2(farmMemberships.userId, ownerId), eq2(farmMemberships.isActive, true)))
@@ -654,30 +655,30 @@ async function getWorkspace(ownerId) {
     db.select().from(cycles).where(inArray(cycles.farmId, farmIds))
   ]);
   const ownedFarmIds = ownedFarms.map((farm) => farm.id);
-  const workerAccountFarmIds = accessibleFarms.filter((farm) => ownedFarmIds.includes(farm.id) || memberships.some((membership) => membership.farmId === farm.id && !membership.houseId && !membership.cycleId && roleCan(membership.role, "manage_expenses"))).map((farm) => farm.id);
+  const farmIdsWithUnscopedCapability = (capability) => accessibleFarms.filter((farm) => ownedFarmIds.includes(farm.id) || memberships.some((membership) => membership.farmId === farm.id && !membership.houseId && !membership.cycleId && roleCan(membership.role, capability))).map((farm) => farm.id);
+  const inventoryFarmIds = farmIdsWithUnscopedCapability("manage_inventory");
+  const financeFarmIds = farmIdsWithUnscopedCapability("manage_expenses");
+  const salesFarmIds = farmIdsWithUnscopedCapability("manage_sales");
+  const invitationFarmIds = farmIdsWithUnscopedCapability("manage_access");
   const allHouses = rawHouses.filter((house) => ownedFarmIds.includes(house.farmId) || memberships.some((membership) => membership.farmId === house.farmId && (!membership.houseId || membership.houseId === house.id)));
   const allCycles = rawCycles.filter((cycle) => ownedFarmIds.includes(cycle.farmId) || memberships.some((membership) => membership.farmId === cycle.farmId && (!membership.houseId || membership.houseId === cycle.houseId) && (!membership.cycleId || membership.cycleId === cycle.id)));
   const activeCycle = allCycles.find((cycle) => cycle.status === "active") ?? allCycles[0];
   const allSections = allHouses.length ? (await Promise.all(allHouses.map((house) => db.select().from(cageSections).where(eq2(cageSections.houseId, house.id))))).flat() : [];
-  const invitations = ownedFarmIds.length ? await db.select().from(invitationCodes).where(inArray(invitationCodes.farmId, ownedFarmIds)).orderBy(desc(invitationCodes.createdAt)) : [];
+  const invitations = invitationFarmIds.length ? await db.select().from(invitationCodes).where(inArray(invitationCodes.farmId, invitationFarmIds)).orderBy(desc(invitationCodes.createdAt)) : [];
   const cycleIds = allCycles.map((cycle) => cycle.id);
   const [inventorySettings, inventoryTransactions, rawExpenses, rawWorkers, rawWorkerAccountEntries, workspaceTraders, workspaceSales, workspaceSalePayments] = await Promise.all([
-    db.select().from(feedInventorySettings).where(inArray(feedInventorySettings.farmId, farmIds)),
-    db.select().from(feedInventoryTransactions).where(inArray(feedInventoryTransactions.farmId, farmIds)).orderBy(desc(feedInventoryTransactions.occurredAt)),
-    db.select().from(farmExpenses).where(inArray(farmExpenses.farmId, farmIds)).orderBy(desc(farmExpenses.expenseDate)),
-    workerAccountFarmIds.length ? db.select().from(workers).where(inArray(workers.farmId, workerAccountFarmIds)).orderBy(desc(workers.createdAt)) : Promise.resolve([]),
-    workerAccountFarmIds.length ? db.select().from(workerAccountEntries).where(inArray(workerAccountEntries.farmId, workerAccountFarmIds)).orderBy(desc(workerAccountEntries.occurredAt)) : Promise.resolve([]),
-    db.select().from(traders).where(inArray(traders.farmId, farmIds)).orderBy(desc(traders.createdAt)),
-    db.select().from(sales).where(and(inArray(sales.farmId, farmIds), eq2(sales.isDeleted, false))).orderBy(desc(sales.saleDate)),
-    db.select().from(salePayments).where(inArray(salePayments.farmId, farmIds)).orderBy(desc(salePayments.paidAt))
+    inventoryFarmIds.length ? db.select().from(feedInventorySettings).where(inArray(feedInventorySettings.farmId, inventoryFarmIds)) : Promise.resolve([]),
+    inventoryFarmIds.length ? db.select().from(feedInventoryTransactions).where(inArray(feedInventoryTransactions.farmId, inventoryFarmIds)).orderBy(desc(feedInventoryTransactions.occurredAt)) : Promise.resolve([]),
+    financeFarmIds.length ? db.select().from(farmExpenses).where(inArray(farmExpenses.farmId, financeFarmIds)).orderBy(desc(farmExpenses.expenseDate)) : Promise.resolve([]),
+    financeFarmIds.length ? db.select().from(workers).where(inArray(workers.farmId, financeFarmIds)).orderBy(desc(workers.createdAt)) : Promise.resolve([]),
+    financeFarmIds.length ? db.select().from(workerAccountEntries).where(inArray(workerAccountEntries.farmId, financeFarmIds)).orderBy(desc(workerAccountEntries.occurredAt)) : Promise.resolve([]),
+    salesFarmIds.length ? db.select().from(traders).where(inArray(traders.farmId, salesFarmIds)).orderBy(desc(traders.createdAt)) : Promise.resolve([]),
+    salesFarmIds.length ? db.select().from(sales).where(and(inArray(sales.farmId, salesFarmIds), eq2(sales.isDeleted, false))).orderBy(desc(sales.saleDate)) : Promise.resolve([]),
+    salesFarmIds.length ? db.select().from(salePayments).where(inArray(salePayments.farmId, salesFarmIds)).orderBy(desc(salePayments.paidAt)) : Promise.resolve([])
   ]);
   const workspaceSaleWeighBatches = workspaceSales.length ? await db.select().from(saleWeighBatches).where(inArray(saleWeighBatches.saleId, workspaceSales.map((sale) => sale.id))).orderBy(desc(saleWeighBatches.weighedAt)) : [];
   const workspaceSaleActivities = workspaceSales.length ? await db.select().from(saleActivities).where(inArray(saleActivities.saleId, workspaceSales.map((sale) => sale.id))).orderBy(desc(saleActivities.createdAt)) : [];
-  const expenses = rawExpenses.filter((expense) => ownedFarmIds.includes(expense.farmId) || memberships.some((membership) => {
-    if (membership.farmId !== expense.farmId) return false;
-    const expenseCycle = allCycles.find((cycle) => cycle.id === expense.cycleId);
-    return (!membership.cycleId || membership.cycleId === expense.cycleId) && (!membership.houseId || expenseCycle?.houseId === membership.houseId);
-  }));
+  const expenses = rawExpenses;
   if (!activeCycle) return { farms: accessibleFarms, houses: allHouses, cageSections: allSections, assignments: [], occupancy: [], cycles: allCycles, records: [], weights: [], health: [], memberships, invitations, feedInventorySettings: inventorySettings, feedInventoryTransactions: inventoryTransactions, expenses, workers: rawWorkers, workerAccountEntries: rawWorkerAccountEntries, traders: workspaceTraders, sales: workspaceSales, salePayments: workspaceSalePayments, saleWeighBatches: workspaceSaleWeighBatches, saleActivities: workspaceSaleActivities };
   const [records, weights, health, occupancy, assignments] = await Promise.all([
     cycleIds.length ? db.select().from(dailyRecords).where(inArray(dailyRecords.cycleId, cycleIds)).orderBy(dailyRecords.recordDate) : Promise.resolve([]),
@@ -2229,7 +2230,7 @@ async function deleteHealthEvent(ownerId, healthEventId) {
 
 // server/db/alerts.ts
 init_schema();
-import { and as and8, desc as desc3, eq as eq14, inArray as inArray7, sql as sql5 } from "drizzle-orm";
+import { and as and9, desc as desc3, eq as eq15, inArray as inArray7, sql as sql5 } from "drizzle-orm";
 
 // shared/alertsEngine.ts
 function getExpectedWeightGrams(ageDays) {
@@ -2449,48 +2450,82 @@ function calculateEpef({ birdsPlaced, mortality, averageWeightGrams, fcr, ageDay
   return livability * averageWeightGrams * 10 / (fcr * ageDays);
 }
 
+// server/db/readAccess.ts
+init_schema();
+import { and as and8, eq as eq14 } from "drizzle-orm";
+async function getReadableFarmScopes(db, userId, capability) {
+  const [ownedFarms, memberships] = await Promise.all([
+    db.select({ id: farms.id }).from(farms).where(eq14(farms.ownerId, userId)),
+    db.select({ farmId: farmMemberships.farmId, role: farmMemberships.role, houseId: farmMemberships.houseId, cycleId: farmMemberships.cycleId }).from(farmMemberships).where(and8(eq14(farmMemberships.userId, userId), eq14(farmMemberships.isActive, true)))
+  ]);
+  return [
+    ...ownedFarms.map((farm) => ({ farmId: farm.id, scope: { houseId: null, cycleId: null } })),
+    ...memberships.filter((membership) => roleCan(membership.role, capability)).map((membership) => ({
+      farmId: membership.farmId,
+      scope: { houseId: membership.houseId, cycleId: membership.cycleId }
+    }))
+  ];
+}
+function canReadFarmScope(scopes, farmId, resourceScope) {
+  return scopes.some((candidate) => candidate.farmId === farmId && scopeAllows(candidate.scope, resourceScope));
+}
+function unrestrictedFarmIds(scopes) {
+  return [...new Set(scopes.filter((item) => !item.scope.houseId && !item.scope.cycleId).map((item) => item.farmId))];
+}
+
 // server/db/alerts.ts
 async function listAlerts(userId, filter) {
   const db = await getDb();
   if (!db) return [];
+  const readableScopes = await getReadableFarmScopes(db, userId, "view_reports");
+  if (!readableScopes.length) return [];
   const conditions = [];
+  const readableFarmIds = [...new Set(readableScopes.map((scope) => scope.farmId))];
+  conditions.push(inArray7(alerts.farmId, readableFarmIds));
+  let requiredFarmId;
   if (filter?.farmId) {
-    await requireFarmCapability(userId, filter.farmId, "manage_farms");
-    conditions.push(eq14(alerts.farmId, filter.farmId));
+    await requireFarmCapability(userId, filter.farmId, "view_reports");
+    requiredFarmId = filter.farmId;
+    conditions.push(eq15(alerts.farmId, filter.farmId));
   }
   if (filter?.cycleId) {
-    conditions.push(eq14(alerts.cycleId, filter.cycleId));
+    const [cycle] = await db.select({ farmId: cycles.farmId, houseId: cycles.houseId }).from(cycles).where(eq15(cycles.id, filter.cycleId)).limit(1);
+    if (!cycle || requiredFarmId && cycle.farmId !== requiredFarmId) throw new Error("\u0627\u0644\u062F\u0648\u0631\u0629 \u0644\u0627 \u062A\u062A\u0628\u0639 \u0627\u0644\u0645\u0632\u0631\u0639\u0629 \u0627\u0644\u0645\u062D\u062F\u062F\u0629");
+    await requireFarmCapability(userId, cycle.farmId, "view_reports", { houseId: cycle.houseId, cycleId: filter.cycleId });
+    conditions.push(eq15(alerts.farmId, cycle.farmId));
+    conditions.push(eq15(alerts.cycleId, filter.cycleId));
   }
   if (filter?.status) {
-    conditions.push(eq14(alerts.status, filter.status));
+    conditions.push(eq15(alerts.status, filter.status));
   } else {
     conditions.push(inArray7(alerts.status, ["active", "acknowledged"]));
   }
-  return db.select().from(alerts).where(conditions.length ? and8(...conditions) : void 0).orderBy(desc3(alerts.createdAt)).limit(100);
+  const rows = await db.select().from(alerts).where(conditions.length ? and9(...conditions) : void 0).orderBy(desc3(alerts.createdAt)).limit(500);
+  return rows.filter((alert) => canReadFarmScope(readableScopes, alert.farmId, { houseId: alert.houseId, cycleId: alert.cycleId })).slice(0, 100);
 }
 async function acknowledgeAlert(userId, alertId) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
-  const [alert] = await db.select().from(alerts).where(eq14(alerts.id, alertId)).limit(1);
+  const [alert] = await db.select().from(alerts).where(eq15(alerts.id, alertId)).limit(1);
   if (!alert) throw new Error("Alert not found");
   await requireFarmCapability(userId, alert.farmId, "manage_farms");
   await db.update(alerts).set({
     status: "acknowledged",
     acknowledgedByUserId: userId,
     acknowledgedAt: /* @__PURE__ */ new Date()
-  }).where(eq14(alerts.id, alertId));
+  }).where(eq15(alerts.id, alertId));
   return { success: true };
 }
 async function resolveAlert(userId, alertId) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
-  const [alert] = await db.select().from(alerts).where(eq14(alerts.id, alertId)).limit(1);
+  const [alert] = await db.select().from(alerts).where(eq15(alerts.id, alertId)).limit(1);
   if (!alert) throw new Error("Alert not found");
   await requireFarmCapability(userId, alert.farmId, "manage_farms");
   await db.update(alerts).set({
     status: "resolved",
     resolvedAt: /* @__PURE__ */ new Date()
-  }).where(eq14(alerts.id, alertId));
+  }).where(eq15(alerts.id, alertId));
   return { success: true };
 }
 async function createAlert(farmId, alertInput, cycleId, houseId) {
@@ -2513,14 +2548,15 @@ async function scanAndSyncCycleAlerts(userId, farmId, cycleId) {
   const db = await getDb();
   if (!db) return [];
   await requireFarmCapability(userId, farmId, "manage_farms");
-  const [cycle] = await db.select().from(cycles).where(eq14(cycles.id, cycleId)).limit(1);
-  if (!cycle || cycle.status === "closed") return [];
+  const [cycle] = await db.select().from(cycles).where(eq15(cycles.id, cycleId)).limit(1);
+  if (!cycle || cycle.farmId !== farmId) throw new Error("\u0627\u0644\u062F\u0648\u0631\u0629 \u0644\u0627 \u062A\u062A\u0628\u0639 \u0627\u0644\u0645\u0632\u0631\u0639\u0629 \u0627\u0644\u0645\u062D\u062F\u062F\u0629");
+  if (cycle.status === "closed") return [];
   const [records, weights, health, [feedSetting], feedTxSummary] = await Promise.all([
-    db.select().from(dailyRecords).where(eq14(dailyRecords.cycleId, cycleId)).orderBy(desc3(dailyRecords.recordDate)),
-    db.select().from(weightSamples).where(eq14(weightSamples.cycleId, cycleId)).orderBy(desc3(weightSamples.sampleDate)),
-    db.select().from(healthEvents).where(eq14(healthEvents.cycleId, cycleId)),
-    db.select().from(feedInventorySettings).where(eq14(feedInventorySettings.farmId, farmId)).limit(1),
-    db.select({ balance: sql5`coalesce(sum(${feedInventoryTransactions.bagDelta}), 0)` }).from(feedInventoryTransactions).where(eq14(feedInventoryTransactions.farmId, farmId))
+    db.select().from(dailyRecords).where(eq15(dailyRecords.cycleId, cycleId)).orderBy(desc3(dailyRecords.recordDate)),
+    db.select().from(weightSamples).where(eq15(weightSamples.cycleId, cycleId)).orderBy(desc3(weightSamples.sampleDate)),
+    db.select().from(healthEvents).where(eq15(healthEvents.cycleId, cycleId)),
+    db.select().from(feedInventorySettings).where(eq15(feedInventorySettings.farmId, farmId)).limit(1),
+    db.select({ balance: sql5`coalesce(sum(${feedInventoryTransactions.bagDelta}), 0)` }).from(feedInventoryTransactions).where(eq15(feedInventoryTransactions.farmId, farmId))
   ]);
   const placementDate = new Date(cycle.placementDate);
   const now = /* @__PURE__ */ new Date();
@@ -2547,7 +2583,7 @@ async function scanAndSyncCycleAlerts(userId, farmId, cycleId) {
     dailyConsumptionBags,
     healthEvents: health
   });
-  const existingActive = await db.select({ alertType: alerts.alertType, title: alerts.title }).from(alerts).where(and8(eq14(alerts.farmId, farmId), eq14(alerts.cycleId, cycleId), eq14(alerts.status, "active")));
+  const existingActive = await db.select({ alertType: alerts.alertType, title: alerts.title }).from(alerts).where(and9(eq15(alerts.farmId, farmId), eq15(alerts.cycleId, cycleId), eq15(alerts.status, "active")));
   const existingKeys = new Set(existingActive.map((a) => `${a.alertType}:${a.title}`));
   for (const item of evaluatedAlerts) {
     const key = `${item.alertType}:${item.title}`;
@@ -2560,10 +2596,39 @@ async function scanAndSyncCycleAlerts(userId, farmId, cycleId) {
 
 // server/db/companies.ts
 init_schema();
-import { count, eq as eq15, inArray as inArray8 } from "drizzle-orm";
+import { count, eq as eq16, inArray as inArray8 } from "drizzle-orm";
+
+// shared/companyAccessPolicy.ts
+function resolveCompanyAccess(user, requestedCompanyId) {
+  const companyId = requestedCompanyId ?? user.companyId;
+  if (!companyId || user.companyId !== companyId) {
+    throw new Error("\u0644\u064A\u0633 \u0644\u062F\u064A\u0643 \u0635\u0644\u0627\u062D\u064A\u0629 \u0644\u0644\u0648\u0635\u0648\u0644 \u0625\u0644\u0649 \u0628\u064A\u0627\u0646\u0627\u062A \u0647\u0630\u0647 \u0627\u0644\u0634\u0631\u0643\u0629");
+  }
+  return companyId;
+}
+function requireCompanyAdministrator(user, requestedCompanyId) {
+  const companyId = resolveCompanyAccess(user, requestedCompanyId);
+  if (user.role !== "admin") {
+    throw new Error("\u0647\u0630\u0647 \u0627\u0644\u0639\u0645\u0644\u064A\u0629 \u0645\u062A\u0627\u062D\u0629 \u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0634\u0631\u0643\u0629 \u0641\u0642\u0637");
+  }
+  return companyId;
+}
+function canViewCompanyRollup(user) {
+  return Boolean(user.companyId && user.role === "admin");
+}
+
+// server/db/companies.ts
+async function getCompanyAccessUser(db, userId) {
+  if (!db) throw new Error("Database is unavailable");
+  const [user] = await db.select({ companyId: users.companyId, role: users.role }).from(users).where(eq16(users.id, userId)).limit(1);
+  if (!user) throw new Error("\u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F");
+  return user;
+}
 async function bootstrapCompany(userId, input) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
+  const user = await getCompanyAccessUser(db, userId);
+  if (user.companyId) throw new Error("\u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u0645\u0631\u062A\u0628\u0637 \u0628\u0627\u0644\u0641\u0639\u0644 \u0628\u0634\u0631\u0643\u0629 \u0648\u0644\u0627 \u064A\u0645\u0643\u0646\u0647 \u0625\u0646\u0634\u0627\u0621 \u0634\u0631\u0643\u0629 \u0623\u062E\u0631\u0649 \u0645\u0646 \u0647\u0630\u0647 \u0627\u0644\u062C\u0644\u0633\u0629");
   const [company] = await db.insert(companies).values({
     name: input.name,
     legalName: input.legalName || null,
@@ -2571,25 +2636,20 @@ async function bootstrapCompany(userId, input) {
     maxFarms: input.subscriptionPlan === "enterprise" ? 50 : input.subscriptionPlan === "pro" ? 10 : 3,
     maxUsersPerFarm: 10
   }).$returningId();
-  await db.update(users).set({ companyId: company.id, role: "admin" }).where(eq15(users.id, userId));
-  await db.update(farms).set({ companyId: company.id }).where(eq15(farms.ownerId, userId));
+  await db.update(users).set({ companyId: company.id, role: "admin" }).where(eq16(users.id, userId));
+  await db.update(farms).set({ companyId: company.id }).where(eq16(farms.ownerId, userId));
   return { companyId: company.id };
 }
 async function getCompany(userId, companyId) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
-  let targetId = companyId;
-  if (!targetId) {
-    const [user] = await db.select({ companyId: users.companyId }).from(users).where(eq15(users.id, userId)).limit(1);
-    targetId = user?.companyId ?? void 0;
-  }
-  if (!targetId) {
-    return null;
-  }
-  const [company] = await db.select().from(companies).where(eq15(companies.id, targetId)).limit(1);
+  const user = await getCompanyAccessUser(db, userId);
+  if (!user.companyId && !companyId) return null;
+  const targetId = resolveCompanyAccess(user, companyId);
+  const [company] = await db.select().from(companies).where(eq16(companies.id, targetId)).limit(1);
   if (!company) return null;
-  const [farmCountResult] = await db.select({ count: count() }).from(farms).where(eq15(farms.companyId, targetId));
-  const [userCountResult] = await db.select({ count: count() }).from(users).where(eq15(users.companyId, targetId));
+  const [farmCountResult] = await db.select({ count: count() }).from(farms).where(eq16(farms.companyId, targetId));
+  const [userCountResult] = await db.select({ count: count() }).from(users).where(eq16(users.companyId, targetId));
   return {
     ...company,
     stats: {
@@ -2603,10 +2663,8 @@ async function getCompany(userId, companyId) {
 async function updateCompany(userId, input) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
-  const [user] = await db.select().from(users).where(eq15(users.id, userId)).limit(1);
-  if (!user || user.companyId !== input.companyId && user.role !== "admin") {
-    throw new Error("\u0644\u064A\u0633 \u0644\u062F\u064A\u0643 \u0635\u0644\u0627\u062D\u064A\u0629 \u0644\u062A\u0639\u062F\u064A\u0644 \u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0634\u0631\u0643\u0629");
-  }
+  const user = await getCompanyAccessUser(db, userId);
+  requireCompanyAdministrator(user, input.companyId);
   const patch = {};
   if (input.name !== void 0) patch.name = input.name;
   if (input.legalName !== void 0) patch.legalName = input.legalName;
@@ -2616,13 +2674,14 @@ async function updateCompany(userId, input) {
   if (input.email !== void 0) patch.email = input.email;
   if (input.address !== void 0) patch.address = input.address;
   if (input.governorate !== void 0) patch.governorate = input.governorate;
-  await db.update(companies).set(patch).where(eq15(companies.id, input.companyId));
+  await db.update(companies).set(patch).where(eq16(companies.id, input.companyId));
   return { success: true };
 }
 async function listCompanyFarms(userId, companyId) {
   const db = await getDb();
   if (!db) return [];
-  const companyFarms = await db.select().from(farms).where(eq15(farms.companyId, companyId));
+  requireCompanyAdministrator(await getCompanyAccessUser(db, userId), companyId);
+  const companyFarms = await db.select().from(farms).where(eq16(farms.companyId, companyId));
   if (!companyFarms.length) return [];
   const farmIds = companyFarms.map((f) => f.id);
   const [allHouses, allCycles] = await Promise.all([
@@ -2649,6 +2708,7 @@ async function listCompanyFarms(userId, companyId) {
 async function listCompanyUsers(userId, companyId) {
   const db = await getDb();
   if (!db) return [];
+  requireCompanyAdministrator(await getCompanyAccessUser(db, userId), companyId);
   return db.select({
     id: users.id,
     name: users.name,
@@ -2656,12 +2716,12 @@ async function listCompanyUsers(userId, companyId) {
     role: users.role,
     lastSignedIn: users.lastSignedIn,
     createdAt: users.createdAt
-  }).from(users).where(eq15(users.companyId, companyId));
+  }).from(users).where(eq16(users.companyId, companyId));
 }
 
 // server/db/reports.ts
 init_schema();
-import { and as and10, eq as eq16, inArray as inArray9 } from "drizzle-orm";
+import { and as and11, eq as eq17, inArray as inArray9 } from "drizzle-orm";
 
 // shared/multiFarmMetrics.ts
 function gradeFarmPerformance(epef, livability) {
@@ -2913,17 +2973,17 @@ function formatCycleAuditCsv(data) {
 async function getCycleAuditReport(userId, cycleId) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
-  const [cycle] = await db.select().from(cycles).where(eq16(cycles.id, cycleId)).limit(1);
+  const [cycle] = await db.select().from(cycles).where(eq17(cycles.id, cycleId)).limit(1);
   if (!cycle) throw new Error("\u0627\u0644\u062F\u0648\u0631\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629");
-  const [farm] = await db.select().from(farms).where(eq16(farms.id, cycle.farmId)).limit(1);
+  const [farm] = await db.select().from(farms).where(eq17(farms.id, cycle.farmId)).limit(1);
   if (!farm) throw new Error("\u0627\u0644\u0645\u0632\u0631\u0639\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629");
   await requireFarmCapability(userId, farm.id, "manage_farms");
-  const [company] = farm.companyId ? await db.select().from(companies).where(eq16(companies.id, farm.companyId)).limit(1) : [null];
+  const [company] = farm.companyId ? await db.select().from(companies).where(eq17(companies.id, farm.companyId)).limit(1) : [null];
   const [daily, weights, expenses, cycleSales] = await Promise.all([
-    db.select().from(dailyRecords).where(eq16(dailyRecords.cycleId, cycleId)).orderBy(dailyRecords.recordDate),
-    db.select().from(weightSamples).where(eq16(weightSamples.cycleId, cycleId)),
-    db.select().from(farmExpenses).where(eq16(farmExpenses.cycleId, cycleId)),
-    db.select().from(sales).where(and10(eq16(sales.cycleId, cycleId), eq16(sales.isDeleted, false)))
+    db.select().from(dailyRecords).where(eq17(dailyRecords.cycleId, cycleId)).orderBy(dailyRecords.recordDate),
+    db.select().from(weightSamples).where(eq17(weightSamples.cycleId, cycleId)),
+    db.select().from(farmExpenses).where(eq17(farmExpenses.cycleId, cycleId)),
+    db.select().from(sales).where(and11(eq17(sales.cycleId, cycleId), eq17(sales.isDeleted, false)))
   ]);
   return generateCycleAuditReport({
     companyName: company?.name,
@@ -2943,19 +3003,19 @@ async function getCycleAuditReportCsv(userId, cycleId) {
 async function getCompanyExecutiveDashboard(userId, companyId) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
-  let targetCompanyId = companyId;
-  if (!targetCompanyId) {
-    const [user] = await db.select({ companyId: users.companyId }).from(users).where(eq16(users.id, userId)).limit(1);
-    targetCompanyId = user?.companyId ?? void 0;
-  }
+  const [user] = await db.select({ companyId: users.companyId, role: users.role }).from(users).where(eq17(users.id, userId)).limit(1);
+  if (!user) throw new Error("\u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F");
+  const requestedCompanyId = companyId;
+  if (requestedCompanyId) requireCompanyAdministrator(user, requestedCompanyId);
+  const targetCompanyId = requestedCompanyId ?? (canViewCompanyRollup(user) ? user.companyId : void 0);
   let accessibleFarms = [];
   if (targetCompanyId) {
-    accessibleFarms = await db.select().from(farms).where(eq16(farms.companyId, targetCompanyId));
+    accessibleFarms = await db.select().from(farms).where(eq17(farms.companyId, targetCompanyId));
   }
   if (!accessibleFarms.length) {
     const [owned, memberships] = await Promise.all([
-      db.select().from(farms).where(eq16(farms.ownerId, userId)),
-      db.select().from(farmMemberships).where(and10(eq16(farmMemberships.userId, userId), eq16(farmMemberships.isActive, true)))
+      db.select().from(farms).where(eq17(farms.ownerId, userId)),
+      db.select().from(farmMemberships).where(and11(eq17(farmMemberships.userId, userId), eq17(farmMemberships.isActive, true)))
     ]);
     const memberFarmIds = memberships.map((m) => m.farmId);
     const sharedFarms = memberFarmIds.length ? await db.select().from(farms).where(inArray9(farms.id, memberFarmIds)) : [];
@@ -2989,7 +3049,7 @@ async function getCompanyExecutiveDashboard(userId, companyId) {
   const [allDaily, allWeights, allSales] = await Promise.all([
     cycleIds.length ? db.select().from(dailyRecords).where(inArray9(dailyRecords.cycleId, cycleIds)) : [],
     cycleIds.length ? db.select().from(weightSamples).where(inArray9(weightSamples.cycleId, cycleIds)) : [],
-    cycleIds.length ? db.select().from(sales).where(and10(inArray9(sales.cycleId, cycleIds), eq16(sales.isDeleted, false))) : []
+    cycleIds.length ? db.select().from(sales).where(and11(inArray9(sales.cycleId, cycleIds), eq17(sales.isDeleted, false))) : []
   ]);
   return computeExecutiveDashboard({
     farms: accessibleFarms,
@@ -3003,23 +3063,35 @@ async function getCompanyExecutiveDashboard(userId, companyId) {
 
 // server/db/audit.ts
 init_schema();
-import { and as and11, desc as desc5, eq as eq17 } from "drizzle-orm";
+import { and as and12, desc as desc5, eq as eq18, inArray as inArray10 } from "drizzle-orm";
 async function listAuditLogs(userId, filter) {
   const db = await getDb();
   if (!db) return [];
   const conditions = [];
+  let constrained = false;
   if (filter?.farmId) {
     await requireFarmCapability(userId, filter.farmId, "view_audit_logs");
-    conditions.push(eq17(auditLogs.farmId, filter.farmId));
+    conditions.push(eq18(auditLogs.farmId, filter.farmId));
+    constrained = true;
   }
   if (filter?.cycleId) {
-    conditions.push(eq17(auditLogs.cycleId, filter.cycleId));
+    const [cycle] = await db.select({ farmId: cycles.farmId, houseId: cycles.houseId }).from(cycles).where(eq18(cycles.id, filter.cycleId)).limit(1);
+    if (!cycle || filter.farmId && cycle.farmId !== filter.farmId) throw new Error("\u0627\u0644\u062F\u0648\u0631\u0629 \u0644\u0627 \u062A\u062A\u0628\u0639 \u0627\u0644\u0645\u0632\u0631\u0639\u0629 \u0627\u0644\u0645\u062D\u062F\u062F\u0629");
+    await requireFarmCapability(userId, cycle.farmId, "view_audit_logs", { houseId: cycle.houseId, cycleId: filter.cycleId });
+    conditions.push(eq18(auditLogs.farmId, cycle.farmId));
+    conditions.push(eq18(auditLogs.cycleId, filter.cycleId));
+    constrained = true;
+  }
+  if (!constrained) {
+    const readableFarmIds = unrestrictedFarmIds(await getReadableFarmScopes(db, userId, "view_audit_logs"));
+    if (!readableFarmIds.length) return [];
+    conditions.push(inArray10(auditLogs.farmId, readableFarmIds));
   }
   if (filter?.entityType) {
-    conditions.push(eq17(auditLogs.entityType, filter.entityType));
+    conditions.push(eq18(auditLogs.entityType, filter.entityType));
   }
   if (filter?.action) {
-    conditions.push(eq17(auditLogs.action, filter.action));
+    conditions.push(eq18(auditLogs.action, filter.action));
   }
   return db.select({
     id: auditLogs.id,
@@ -3035,17 +3107,17 @@ async function listAuditLogs(userId, filter) {
     newValues: auditLogs.newValues,
     details: auditLogs.details,
     createdAt: auditLogs.createdAt
-  }).from(auditLogs).leftJoin(users, eq17(auditLogs.userId, users.id)).where(conditions.length ? and11(...conditions) : void 0).orderBy(desc5(auditLogs.createdAt)).limit(filter?.limit ?? 100);
+  }).from(auditLogs).leftJoin(users, eq18(auditLogs.userId, users.id)).where(conditions.length ? and12(...conditions) : void 0).orderBy(desc5(auditLogs.createdAt)).limit(filter?.limit ?? 100);
 }
 
 // server/db/medicineInventory.ts
 init_schema();
-import { desc as desc6, eq as eq18 } from "drizzle-orm";
+import { desc as desc6, eq as eq19 } from "drizzle-orm";
 async function listMedicineInventory(userId, farmId) {
   const db = await getDb();
   if (!db) return [];
   await requireFarmCapability(userId, farmId, "manage_health");
-  return db.select().from(medicineInventory).where(eq18(medicineInventory.farmId, farmId)).orderBy(desc6(medicineInventory.createdAt));
+  return db.select().from(medicineInventory).where(eq19(medicineInventory.farmId, farmId)).orderBy(desc6(medicineInventory.createdAt));
 }
 async function addMedicineItem(userId, input) {
   const db = await getDb();
@@ -3069,29 +3141,29 @@ async function addMedicineItem(userId, input) {
 async function updateMedicineQuantity(userId, input) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
-  const [item] = await db.select().from(medicineInventory).where(eq18(medicineInventory.id, input.itemId)).limit(1);
+  const [item] = await db.select().from(medicineInventory).where(eq19(medicineInventory.id, input.itemId)).limit(1);
   if (!item) throw new Error("\u0627\u0644\u0635\u0646\u0641 \u0627\u0644\u062F\u0648\u0627\u0626\u064A \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F");
   await requireFarmCapability(userId, item.farmId, "manage_health");
   const currentQty = Number(item.quantity);
   const nextQty = Math.max(0, currentQty + input.quantityDelta);
   await db.update(medicineInventory).set({
     quantity: nextQty.toFixed(2)
-  }).where(eq18(medicineInventory.id, input.itemId));
+  }).where(eq19(medicineInventory.id, input.itemId));
   return { previousQuantity: currentQty, newQuantity: nextQty };
 }
 async function deleteMedicineItem(userId, itemId) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
-  const [item] = await db.select().from(medicineInventory).where(eq18(medicineInventory.id, itemId)).limit(1);
+  const [item] = await db.select().from(medicineInventory).where(eq19(medicineInventory.id, itemId)).limit(1);
   if (!item) throw new Error("\u0627\u0644\u0635\u0646\u0641 \u0627\u0644\u062F\u0648\u0627\u0626\u064A \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F");
   await requireFarmCapability(userId, item.farmId, "manage_health");
-  await db.delete(medicineInventory).where(eq18(medicineInventory.id, itemId));
+  await db.delete(medicineInventory).where(eq19(medicineInventory.id, itemId));
   return { success: true };
 }
 
 // server/db/sensors.ts
 init_schema();
-import { and as and12, desc as desc7, eq as eq19, gte } from "drizzle-orm";
+import { and as and13, desc as desc7, eq as eq20, gte } from "drizzle-orm";
 
 // shared/iotSensors.ts
 function getTargetTemperatureRange(ageDays) {
@@ -3195,6 +3267,8 @@ function evaluateSensorReading(sensorType, value, ageDays = 21) {
 async function ingestSensorReadings(userId, input) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
+  const [house] = await db.select({ farmId: houses.farmId }).from(houses).where(eq20(houses.id, input.houseId)).limit(1);
+  if (!house || house.farmId !== input.farmId) throw new Error("\u0627\u0644\u0639\u0646\u0628\u0631 \u0644\u0627 \u064A\u062A\u0628\u0639 \u0627\u0644\u0645\u0632\u0631\u0639\u0629 \u0627\u0644\u0645\u062D\u062F\u062F\u0629");
   await requireFarmCapability(userId, input.farmId, "record_operations", {
     houseId: input.houseId,
     cycleId: null
@@ -3223,11 +3297,13 @@ async function ingestSensorReadings(userId, input) {
 async function getLatestHouseReadings(userId, farmId, houseId) {
   const db = await getDb();
   if (!db) return [];
+  const [house] = await db.select({ farmId: houses.farmId }).from(houses).where(eq20(houses.id, houseId)).limit(1);
+  if (!house || house.farmId !== farmId) throw new Error("\u0627\u0644\u0639\u0646\u0628\u0631 \u0644\u0627 \u064A\u062A\u0628\u0639 \u0627\u0644\u0645\u0632\u0631\u0639\u0629 \u0627\u0644\u0645\u062D\u062F\u062F\u0629");
   await requireFarmCapability(userId, farmId, "view_reports", {
     houseId,
     cycleId: null
   });
-  const recent = await db.select().from(sensorReadings).where(and12(eq19(sensorReadings.farmId, farmId), eq19(sensorReadings.houseId, houseId))).orderBy(desc7(sensorReadings.readingTime)).limit(50);
+  const recent = await db.select().from(sensorReadings).where(and13(eq20(sensorReadings.farmId, farmId), eq20(sensorReadings.houseId, houseId))).orderBy(desc7(sensorReadings.readingTime)).limit(50);
   const latestMap = /* @__PURE__ */ new Map();
   recent.forEach((item) => {
     if (!latestMap.has(item.sensorType)) {
@@ -3243,20 +3319,22 @@ async function getLatestHouseReadings(userId, farmId, houseId) {
 async function getHouseTelemetryHistory(userId, input) {
   const db = await getDb();
   if (!db) return [];
+  const [house] = await db.select({ farmId: houses.farmId }).from(houses).where(eq20(houses.id, input.houseId)).limit(1);
+  if (!house || house.farmId !== input.farmId) throw new Error("\u0627\u0644\u0639\u0646\u0628\u0631 \u0644\u0627 \u064A\u062A\u0628\u0639 \u0627\u0644\u0645\u0632\u0631\u0639\u0629 \u0627\u0644\u0645\u062D\u062F\u062F\u0629");
   await requireFarmCapability(userId, input.farmId, "view_reports", {
     houseId: input.houseId,
     cycleId: null
   });
   const sinceTime = new Date(Date.now() - (input.hours ?? 24) * 60 * 60 * 1e3);
   const conditions = [
-    eq19(sensorReadings.farmId, input.farmId),
-    eq19(sensorReadings.houseId, input.houseId),
+    eq20(sensorReadings.farmId, input.farmId),
+    eq20(sensorReadings.houseId, input.houseId),
     gte(sensorReadings.readingTime, sinceTime)
   ];
   if (input.sensorType) {
-    conditions.push(eq19(sensorReadings.sensorType, input.sensorType));
+    conditions.push(eq20(sensorReadings.sensorType, input.sensorType));
   }
-  return db.select().from(sensorReadings).where(and12(...conditions)).orderBy(desc7(sensorReadings.readingTime)).limit(500);
+  return db.select().from(sensorReadings).where(and13(...conditions)).orderBy(desc7(sensorReadings.readingTime)).limit(500);
 }
 
 // server/db/backup.ts
@@ -3383,7 +3461,7 @@ async function exportCompanyBackup(userId, farmId) {
 // server/db/localAuth.ts
 init_schema();
 import { randomBytes as randomBytes3 } from "crypto";
-import { eq as eq21 } from "drizzle-orm";
+import { eq as eq22 } from "drizzle-orm";
 
 // server/_core/password.ts
 import { randomBytes as randomBytes2, scryptSync, timingSafeEqual } from "crypto";
@@ -3677,7 +3755,7 @@ async function registerLocalUser(input) {
   if (!db) throw new Error("Database is unavailable");
   const cleanEmail = input.email.trim().toLowerCase();
   const cleanName = input.name.trim();
-  const [existingUser] = await db.select().from(users).where(eq21(users.email, cleanEmail)).limit(1);
+  const [existingUser] = await db.select().from(users).where(eq22(users.email, cleanEmail)).limit(1);
   if (existingUser) {
     throw new Error("\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0645\u0633\u062C\u0644 \u0628\u0627\u0644\u0641\u0639\u0644\u060C \u064A\u0631\u062C\u0649 \u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u062E\u0648\u0644");
   }
@@ -3704,7 +3782,7 @@ async function registerLocalUser(input) {
     isEmailVerified: true,
     lastSignedIn: now
   }).$returningId();
-  const [userRecord] = await db.select().from(users).where(eq21(users.id, createdUser.id)).limit(1);
+  const [userRecord] = await db.select().from(users).where(eq22(users.id, createdUser.id)).limit(1);
   const sessionToken = await sdk.createSessionToken(openId, {
     name: cleanName
   });
@@ -3714,7 +3792,7 @@ async function loginLocalUser(input) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
   const cleanEmail = input.email.trim().toLowerCase();
-  const [user] = await db.select().from(users).where(eq21(users.email, cleanEmail)).limit(1);
+  const [user] = await db.select().from(users).where(eq22(users.email, cleanEmail)).limit(1);
   if (!user || !user.passwordHash) {
     throw new Error("\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0623\u0648 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u063A\u064A\u0631 \u0635\u062D\u064A\u062D\u0629");
   }
@@ -3723,7 +3801,7 @@ async function loginLocalUser(input) {
     throw new Error("\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0623\u0648 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u063A\u064A\u0631 \u0635\u062D\u064A\u062D\u0629");
   }
   const now = /* @__PURE__ */ new Date();
-  await db.update(users).set({ lastSignedIn: now }).where(eq21(users.id, user.id));
+  await db.update(users).set({ lastSignedIn: now }).where(eq22(users.id, user.id));
   const sessionToken = await sdk.createSessionToken(user.openId, {
     name: user.name || "User"
   });
@@ -3732,7 +3810,7 @@ async function loginLocalUser(input) {
 async function changeLocalUserPassword(userId, input) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
-  const [user] = await db.select().from(users).where(eq21(users.id, userId)).limit(1);
+  const [user] = await db.select().from(users).where(eq22(users.id, userId)).limit(1);
   if (!user || !user.passwordHash) {
     throw new Error("\u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F \u0623\u0648 \u0644\u0627 \u064A\u0645\u0644\u0643 \u0643\u0644\u0645\u0629 \u0645\u0631\u0648\u0631 \u0645\u0633\u062C\u0644\u0629");
   }
@@ -3741,7 +3819,7 @@ async function changeLocalUserPassword(userId, input) {
     throw new Error("\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0627\u0644\u062D\u0627\u0644\u064A\u0629 \u063A\u064A\u0631 \u0635\u062D\u064A\u062D\u0629");
   }
   const newHash = hashPassword(input.newPassword);
-  await db.update(users).set({ passwordHash: newHash }).where(eq21(users.id, userId));
+  await db.update(users).set({ passwordHash: newHash }).where(eq22(users.id, userId));
   return { success: true };
 }
 
@@ -4025,7 +4103,7 @@ function checkResourceLimit(plan, resourceType, currentCount) {
 
 // server/weather.ts
 init_schema();
-import { and as and13, eq as eq22 } from "drizzle-orm";
+import { and as and14, eq as eq23 } from "drizzle-orm";
 
 // shared/weather.ts
 function cycleDayFromDate(placementDate, weatherDate) {
@@ -4076,16 +4154,16 @@ async function getCycleDayWeather(userId, input) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
   const weatherDay = /* @__PURE__ */ new Date(`${input.weatherDate}T00:00:00.000Z`);
-  const [cycleFarm] = await db.select({ farmId: cycles.farmId, placementDate: cycles.placementDate, latitude: farms.latitude, longitude: farms.longitude, name: farms.name }).from(cycles).innerJoin(farms, eq22(cycles.farmId, farms.id)).where(eq22(cycles.id, input.cycleId)).limit(1);
+  const [cycleFarm] = await db.select({ farmId: cycles.farmId, placementDate: cycles.placementDate, latitude: farms.latitude, longitude: farms.longitude, name: farms.name }).from(cycles).innerJoin(farms, eq23(cycles.farmId, farms.id)).where(eq23(cycles.id, input.cycleId)).limit(1);
   if (!cycleFarm) throw new Error("Cycle not found");
-  const [farm] = await db.select({ ownerId: farms.ownerId }).from(farms).where(eq22(farms.id, cycleFarm.farmId)).limit(1);
+  const [farm] = await db.select({ ownerId: farms.ownerId }).from(farms).where(eq23(farms.id, cycleFarm.farmId)).limit(1);
   if (!farm || farm.ownerId !== userId) {
     const { farmMemberships: farmMemberships3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const [membership] = await db.select({ id: farmMemberships3.id }).from(farmMemberships3).where(and13(eq22(farmMemberships3.userId, userId), eq22(farmMemberships3.farmId, cycleFarm.farmId), eq22(farmMemberships3.isActive, true))).limit(1);
+    const [membership] = await db.select({ id: farmMemberships3.id }).from(farmMemberships3).where(and14(eq23(farmMemberships3.userId, userId), eq23(farmMemberships3.farmId, cycleFarm.farmId), eq23(farmMemberships3.isActive, true))).limit(1);
     if (!membership) throw new Error("You do not have access to this farm weather");
   }
   if (!cycleFarm.latitude || !cycleFarm.longitude) return { state: "location_required", farmName: cycleFarm.name };
-  const [cached] = await db.select().from(farmWeatherDays).where(and13(eq22(farmWeatherDays.farmId, cycleFarm.farmId), eq22(farmWeatherDays.weatherDate, weatherDay))).limit(1);
+  const [cached] = await db.select().from(farmWeatherDays).where(and14(eq23(farmWeatherDays.farmId, cycleFarm.farmId), eq23(farmWeatherDays.weatherDate, weatherDay))).limit(1);
   const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
   const shouldRefresh = input.weatherDate >= today;
   let weather;
@@ -4094,7 +4172,7 @@ async function getCycleDayWeather(userId, input) {
   } else {
     weather = await fetchDailyWeather(Number(cycleFarm.latitude), Number(cycleFarm.longitude), input.weatherDate);
     const values = { farmId: cycleFarm.farmId, weatherDate: weatherDay, weatherCode: weather.weatherCode, currentTemperature: weather.currentTemperature?.toFixed(1) ?? null, temperatureHigh: weather.temperatureHigh.toFixed(1), temperatureLow: weather.temperatureLow.toFixed(1), humidity: weather.humidity, windSpeed: weather.windSpeed?.toFixed(1) ?? null, apparentTemperature: weather.apparentTemperature?.toFixed(1) ?? null, source: "open-meteo" };
-    if (cached) await db.update(farmWeatherDays).set({ ...values, syncedAt: /* @__PURE__ */ new Date() }).where(eq22(farmWeatherDays.id, cached.id));
+    if (cached) await db.update(farmWeatherDays).set({ ...values, syncedAt: /* @__PURE__ */ new Date() }).where(eq23(farmWeatherDays.id, cached.id));
     else await db.insert(farmWeatherDays).values(values);
   }
   return { state: "ready", weatherDate: input.weatherDate, cycleDay: cycleDayFromDate(cycleFarm.placementDate, input.weatherDate), farmName: cycleFarm.name, ...weather };

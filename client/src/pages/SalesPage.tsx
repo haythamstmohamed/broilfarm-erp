@@ -160,7 +160,7 @@ export default function SalesPage() {
         await reopenSaleMutation.mutateAsync({ saleId });
       }}
       onFinalizeCycle={async (cycleId) => {
-        await finalizeCycleMutation.mutateAsync({ cycleId });
+        return finalizeCycleMutation.mutateAsync({ cycleId });
       }}
     />
   );

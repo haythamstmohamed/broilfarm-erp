@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { companies, cycles, dailyRecords, farmExpenses, farmMemberships, farms, sales, users, weightSamples } from "../../drizzle/schema";
 import { computeExecutiveDashboard, ExecutiveCompanyDashboard } from "../../shared/multiFarmMetrics";
+import { canViewCompanyRollup, requireCompanyAdministrator } from "../../shared/companyAccessPolicy";
 import { formatCycleAuditCsv, generateCycleAuditReport, CycleAuditReportData } from "../../shared/reportGenerator";
 import { requireFarmCapability } from "./auth";
 import { getDb } from "./connection";
@@ -48,11 +49,12 @@ export async function getCompanyExecutiveDashboard(userId: number, companyId?: n
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
 
-  let targetCompanyId = companyId;
-  if (!targetCompanyId) {
-    const [user] = await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1);
-    targetCompanyId = user?.companyId ?? undefined;
-  }
+  const [user] = await db.select({ companyId: users.companyId, role: users.role }).from(users).where(eq(users.id, userId)).limit(1);
+  if (!user) throw new Error("المستخدم غير موجود");
+
+  const requestedCompanyId = companyId;
+  if (requestedCompanyId) requireCompanyAdministrator(user, requestedCompanyId);
+  const targetCompanyId = requestedCompanyId ?? (canViewCompanyRollup(user) ? user.companyId : undefined);
 
   // If user belongs to a company, query company farms; otherwise query user's accessible farms
   let accessibleFarms: typeof farms.$inferSelect[] = [];

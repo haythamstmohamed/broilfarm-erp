@@ -1,20 +1,32 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { alerts, cycles, dailyRecords, farms, feedInventorySettings, feedInventoryTransactions, healthEvents, weightSamples } from "../../drizzle/schema";
+import { alerts, cycles, dailyRecords, feedInventorySettings, feedInventoryTransactions, healthEvents, weightSamples } from "../../drizzle/schema";
 import { EvaluatedAlert, scanCycleAnomalies } from "../../shared/alertsEngine";
 import { calculateFcr } from "../../shared/farmMetrics";
 import { requireFarmCapability } from "./auth";
 import { getDb } from "./connection";
+import { canReadFarmScope, getReadableFarmScopes } from "./readAccess";
 
 export async function listAlerts(userId: number, filter?: { farmId?: number; cycleId?: number; status?: "active" | "acknowledged" | "resolved" | "dismissed" }) {
   const db = await getDb();
   if (!db) return [];
 
+  const readableScopes = await getReadableFarmScopes(db, userId, "view_reports");
+  if (!readableScopes.length) return [];
+
   const conditions = [];
+  const readableFarmIds = [...new Set(readableScopes.map((scope) => scope.farmId))];
+  conditions.push(inArray(alerts.farmId, readableFarmIds));
+  let requiredFarmId: number | undefined;
   if (filter?.farmId) {
-    await requireFarmCapability(userId, filter.farmId, "manage_farms");
+    await requireFarmCapability(userId, filter.farmId, "view_reports");
+    requiredFarmId = filter.farmId;
     conditions.push(eq(alerts.farmId, filter.farmId));
   }
   if (filter?.cycleId) {
+    const [cycle] = await db.select({ farmId: cycles.farmId, houseId: cycles.houseId }).from(cycles).where(eq(cycles.id, filter.cycleId)).limit(1);
+    if (!cycle || (requiredFarmId && cycle.farmId !== requiredFarmId)) throw new Error("الدورة لا تتبع المزرعة المحددة");
+    await requireFarmCapability(userId, cycle.farmId, "view_reports", { houseId: cycle.houseId, cycleId: filter.cycleId });
+    conditions.push(eq(alerts.farmId, cycle.farmId));
     conditions.push(eq(alerts.cycleId, filter.cycleId));
   }
   if (filter?.status) {
@@ -24,12 +36,16 @@ export async function listAlerts(userId: number, filter?: { farmId?: number; cyc
     conditions.push(inArray(alerts.status, ["active", "acknowledged"]));
   }
 
-  return db
+  const rows = await db
     .select()
     .from(alerts)
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(desc(alerts.createdAt))
-    .limit(100);
+    .limit(500);
+
+  return rows
+    .filter((alert) => canReadFarmScope(readableScopes, alert.farmId, { houseId: alert.houseId, cycleId: alert.cycleId }))
+    .slice(0, 100);
 }
 
 export async function acknowledgeAlert(userId: number, alertId: number) {
@@ -100,7 +116,8 @@ export async function scanAndSyncCycleAlerts(userId: number, farmId: number, cyc
   await requireFarmCapability(userId, farmId, "manage_farms");
 
   const [cycle] = await db.select().from(cycles).where(eq(cycles.id, cycleId)).limit(1);
-  if (!cycle || cycle.status === "closed") return [];
+  if (!cycle || cycle.farmId !== farmId) throw new Error("الدورة لا تتبع المزرعة المحددة");
+  if (cycle.status === "closed") return [];
 
   // Fetch operational records
   const [records, weights, health, [feedSetting], feedTxSummary] = await Promise.all([

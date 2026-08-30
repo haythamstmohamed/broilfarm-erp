@@ -8,8 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { HeartPulse, Calculator, PackageCheck } from "lucide-react";
 
 export default function HealthPage() {
-  const { activeFarmId, activeCycleId, cycleHouses, cycleHealth, currentLiveBirds, avgWeightGrams } = useWorkspaceContext();
+  const { activeFarmId, activeCycleId, cycleHouses, cycleHealth, workspace } = useWorkspaceContext();
   const [activeTab, setActiveTab] = useState<"log" | "inventory" | "calculator">("log");
+  const calculatorHouses = cycleHouses.map((house) => ({
+    id: house.id,
+    name: house.name,
+    assignedBirds: (workspace?.assignments ?? []).find((assignment) => assignment.cycleId === activeCycleId && assignment.houseId === house.id)?.assignedBirds ?? 0,
+  }));
 
   return (
     <div className="space-y-6">
@@ -105,7 +110,11 @@ export default function HealthPage() {
       )}
 
       {activeTab === "calculator" && (
-        <MedicationDoseCalculator />
+        <MedicationDoseCalculator
+          open
+          onOpenChange={(open) => { if (!open) setActiveTab("log"); }}
+          houses={calculatorHouses}
+        />
       )}
     </div>
   );

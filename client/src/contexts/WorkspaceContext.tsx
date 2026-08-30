@@ -99,7 +99,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const cycleHouses = useMemo(() => {
     if (!activeCycleId || !workspace) return farmHouses;
-    const assignments = workspace.assignments.filter((a) => a.cycleId === activeCycleId);
+    const assignments = (workspace.assignments ?? []).filter((a) => a.cycleId === activeCycleId);
     if (assignments.length > 0) {
       const assignedHouseIds = new Set(assignments.map((a) => a.houseId));
       return farmHouses.filter((h) => assignedHouseIds.has(h.id));

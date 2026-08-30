@@ -28,7 +28,7 @@ export default function AccessPage() {
   const createInviteMutation = trpc.workspace.createInvitation.useMutation({
     onSuccess: (data) => {
       toast.success("تم إنشاء كود الدعوة بنجاح");
-      setCreatedCode(data.invitationCode);
+      setCreatedCode(data.code);
       refetch();
     },
     onError: (err) => {

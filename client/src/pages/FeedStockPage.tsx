@@ -45,10 +45,13 @@ export default function FeedStockPage() {
     const bagWeight = farmSettings.bagWeightKg || 50;
     const dailyDemandBags = bagWeight > 0 ? Number((dailyDemandKg / bagWeight).toFixed(2)) : 0;
 
+    const availableBags = farmTransactions.reduce((total, transaction) => total + transaction.bagDelta, 0);
     return feedInventorySnapshot({
-      settings: farmSettings,
-      transactions: farmTransactions,
-      dailyDemandBags,
+      availableBags,
+      reorderPointBags: farmSettings.reorderPointBags,
+      bagWeightKg: bagWeight,
+      forecastFeedKg: dailyDemandKg,
+      hasTrackedStock: farmTransactions.length > 0,
     });
   }, [farmSettings, farmTransactions, activeCycle]);
 

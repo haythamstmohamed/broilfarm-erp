@@ -21,6 +21,8 @@ export async function ingestSensorReadings(
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
 
+  const [house] = await db.select({ farmId: houses.farmId }).from(houses).where(eq(houses.id, input.houseId)).limit(1);
+  if (!house || house.farmId !== input.farmId) throw new Error("العنبر لا يتبع المزرعة المحددة");
   await requireFarmCapability(userId, input.farmId, "record_operations", {
     houseId: input.houseId,
     cycleId: null,
@@ -58,6 +60,8 @@ export async function getLatestHouseReadings(userId: number, farmId: number, hou
   const db = await getDb();
   if (!db) return [];
 
+  const [house] = await db.select({ farmId: houses.farmId }).from(houses).where(eq(houses.id, houseId)).limit(1);
+  if (!house || house.farmId !== farmId) throw new Error("العنبر لا يتبع المزرعة المحددة");
   await requireFarmCapability(userId, farmId, "view_reports", {
     houseId,
     cycleId: null,
@@ -98,6 +102,8 @@ export async function getHouseTelemetryHistory(
   const db = await getDb();
   if (!db) return [];
 
+  const [house] = await db.select({ farmId: houses.farmId }).from(houses).where(eq(houses.id, input.houseId)).limit(1);
+  if (!house || house.farmId !== input.farmId) throw new Error("العنبر لا يتبع المزرعة المحددة");
   await requireFarmCapability(userId, input.farmId, "view_reports", {
     houseId: input.houseId,
     cycleId: null,

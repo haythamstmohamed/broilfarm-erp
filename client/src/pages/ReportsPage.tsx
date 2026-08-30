@@ -25,8 +25,8 @@ export default function ReportsPage() {
   const handleDownloadCsv = async () => {
     try {
       const res = await csvQuery.refetch();
-      if (res.data?.csv) {
-        const blob = new Blob([res.data.csv], { type: "text/csv;charset=utf-8;" });
+      if (res.data) {
+        const blob = new Blob([res.data], { type: "text/csv;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.setAttribute("href", url);
@@ -143,34 +143,34 @@ export default function ReportsPage() {
                 <CardContent className="space-y-3">
                   <div className="flex justify-between py-1.5 border-b text-sm">
                     <span className="text-muted-foreground">العدد المسكن:</span>
-                    <span className="font-bold">{report.summary?.birdsPlaced?.toLocaleString("ar-EG") || 0} طائر</span>
+                    <span className="font-bold">{report.header.birdsPlaced.toLocaleString("ar-EG")} طائر</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b text-sm">
                     <span className="text-muted-foreground">إجمالي النفوق والفرز:</span>
-                    <span className="font-bold text-rose-600">{report.summary?.totalMortality?.toLocaleString("ar-EG") || 0} طائر</span>
+                    <span className="font-bold text-rose-600">{report.kpiSummary.totalLosses.toLocaleString("ar-EG")} طائر</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b text-sm">
                     <span className="text-muted-foreground">نسبة النفوق:</span>
-                    <span className="font-bold">%{report.summary?.mortalityRate || "0.00"}</span>
+                    <span className="font-bold">%{(100 - report.kpiSummary.livabilityPercent).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b text-sm">
                     <span className="text-muted-foreground">إجمالي العلف المستهلك:</span>
-                    <span className="font-bold">{report.summary?.totalFeedKg?.toLocaleString("ar-EG") || 0} كجم</span>
+                    <span className="font-bold">{report.kpiSummary.totalFeedKg.toLocaleString("ar-EG")} كجم</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b text-sm">
                     <span className="text-muted-foreground">معامل التحويل (FCR):</span>
-                    <span className="font-black text-emerald-600">{report.summary?.fcr || "—"}</span>
+                    <span className="font-black text-emerald-600">{report.kpiSummary.fcr || "—"}</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b text-sm">
                     <span className="text-muted-foreground">معامل الكفاءة الأوروبي (EPEF):</span>
                     <span className="font-black text-primary">
-                      {report.summary?.epef ? `${Math.round(report.summary.epef)} نقطة` : "—"}
+                      {report.kpiSummary.epef ? `${Math.round(report.kpiSummary.epef)} نقطة` : "—"}
                     </span>
                   </div>
                   <div className="flex justify-between py-1.5 text-sm">
                     <span className="text-muted-foreground">نسبة الحيوية (Livability):</span>
                     <span className="font-bold text-emerald-600">
-                      %{((1 - (report.summary?.totalMortality || 0) / (report.summary?.birdsPlaced || 1)) * 100).toFixed(2)}
+                      %{report.kpiSummary.livabilityPercent.toFixed(2)}
                     </span>
                   </div>
                 </CardContent>
@@ -184,25 +184,25 @@ export default function ReportsPage() {
                   <div className="flex justify-between py-1.5 border-b text-sm">
                     <span className="text-muted-foreground">إجمالي المصروفات:</span>
                     <span className="font-bold text-rose-600">
-                      {((report.summary?.totalExpensesPiasters || 0) / 100).toLocaleString("ar-EG")} ج.م
+                      {report.financialSummary.totalExpensesEgp.toLocaleString("ar-EG")} ج.م
                     </span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b text-sm">
                     <span className="text-muted-foreground">إجمالي إيرادات المبيعات:</span>
                     <span className="font-bold text-emerald-600">
-                      {((report.summary?.totalSalesPiasters || 0) / 100).toLocaleString("ar-EG")} ج.م
+                      {report.financialSummary.totalSalesEgp.toLocaleString("ar-EG")} ج.م
                     </span>
                   </div>
                   <div className="flex justify-between py-1.5 text-sm font-black">
                     <span>صافي أرباح الدورة:</span>
                     <span
                       className={
-                        (report.summary?.netProfitPiasters || 0) >= 0
+                        report.financialSummary.netProfitEgp >= 0
                           ? "text-emerald-600 text-lg"
                           : "text-rose-600 text-lg"
                       }
                     >
-                      {((report.summary?.netProfitPiasters || 0) / 100).toLocaleString("ar-EG")} ج.م
+                      {report.financialSummary.netProfitEgp.toLocaleString("ar-EG")} ج.م
                     </span>
                   </div>
                 </CardContent>

@@ -1,10 +1,25 @@
 import { and, count, eq, inArray } from "drizzle-orm";
 import { companies, cycles, farmMemberships, farms, houses, users } from "../../drizzle/schema";
+import { requireCompanyAdministrator, resolveCompanyAccess } from "../../shared/companyAccessPolicy";
 import { getDb } from "./connection";
+
+async function getCompanyAccessUser(db: Awaited<ReturnType<typeof getDb>>, userId: number) {
+  if (!db) throw new Error("Database is unavailable");
+  const [user] = await db
+    .select({ companyId: users.companyId, role: users.role })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!user) throw new Error("المستخدم غير موجود");
+  return user;
+}
 
 export async function bootstrapCompany(userId: number, input: { name: string; legalName?: string; subscriptionPlan?: "free" | "starter" | "pro" | "business" | "enterprise" }) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
+
+  const user = await getCompanyAccessUser(db, userId);
+  if (user.companyId) throw new Error("المستخدم مرتبط بالفعل بشركة ولا يمكنه إنشاء شركة أخرى من هذه الجلسة");
 
   const [company] = await db
     .insert(companies)
@@ -30,16 +45,9 @@ export async function getCompany(userId: number, companyId?: number) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
 
-  let targetId = companyId;
-  if (!targetId) {
-    const [user] = await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, userId)).limit(1);
-    targetId = user?.companyId ?? undefined;
-  }
-
-  if (!targetId) {
-    // Return null if user has no company yet
-    return null;
-  }
+  const user = await getCompanyAccessUser(db, userId);
+  if (!user.companyId && !companyId) return null;
+  const targetId = resolveCompanyAccess(user, companyId);
 
   const [company] = await db.select().from(companies).where(eq(companies.id, targetId)).limit(1);
   if (!company) return null;
@@ -76,10 +84,8 @@ export async function updateCompany(
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
 
-  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-  if (!user || (user.companyId !== input.companyId && user.role !== "admin")) {
-    throw new Error("ليس لديك صلاحية لتعديل بيانات الشركة");
-  }
+  const user = await getCompanyAccessUser(db, userId);
+  requireCompanyAdministrator(user, input.companyId);
 
   const patch: Record<string, unknown> = {};
   if (input.name !== undefined) patch.name = input.name;
@@ -98,6 +104,8 @@ export async function updateCompany(
 export async function listCompanyFarms(userId: number, companyId: number) {
   const db = await getDb();
   if (!db) return [];
+
+  requireCompanyAdministrator(await getCompanyAccessUser(db, userId), companyId);
 
   const companyFarms = await db.select().from(farms).where(eq(farms.companyId, companyId));
   if (!companyFarms.length) return [];
@@ -132,6 +140,8 @@ export async function listCompanyFarms(userId: number, companyId: number) {
 export async function listCompanyUsers(userId: number, companyId: number) {
   const db = await getDb();
   if (!db) return [];
+
+  requireCompanyAdministrator(await getCompanyAccessUser(db, userId), companyId);
 
   return db
     .select({

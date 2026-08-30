@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useWorkspaceContext } from "@/contexts/WorkspaceContext";
 import { ExecutiveDashboard } from "@/components/ExecutiveDashboard";
 import { EnvironmentalSensorsPanel } from "@/components/EnvironmentalSensorsPanel";
-import { AIChatBox } from "@/components/AIChatBox";
+import { AIChatBox, type Message } from "@/components/AIChatBox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -59,6 +59,10 @@ export default function Dashboard() {
   } = useWorkspaceContext();
 
   const [activeTab, setActiveTab] = useState<"overview" | "executive" | "sensors" | "ai">("overview");
+  const aiMessages: Message[] = [{
+    role: "assistant",
+    content: "تظهر هنا مستقبلاً ملخصات تحليلية مبنية على بيانات الدورة. لا تستخدم هذه المساحة للتشخيص البيطري أو تحديد الجرعات؛ راجع الطبيب البيطري المختص.",
+  }];
 
   const alertsQuery = trpc.alerts.list.useQuery(
     { farmId: activeFarmId || undefined, status: "active" },
@@ -401,7 +405,7 @@ export default function Dashboard() {
 
       {/* Tab 2: Executive Dashboard */}
       {activeTab === "executive" && (
-        <ExecutiveDashboard companyId={workspace?.farms[0]?.companyId || undefined} />
+        <ExecutiveDashboard />
       )}
 
       {/* Tab 3: IoT Environmental Sensors */}
@@ -412,7 +416,12 @@ export default function Dashboard() {
       {/* Tab 4: AI Intelligent Assistant */}
       {activeTab === "ai" && (
         <div className="max-w-3xl mx-auto">
-          <AIChatBox />
+          <AIChatBox
+            messages={aiMessages}
+            onSendMessage={() => toast.info("طبقة التحليل الذكي التفاعلي لم تُفعّل بعد في هذه البيئة.")}
+            emptyStateMessage="لا توجد تحليلات جاهزة بعد."
+            placeholder="اسأل عن مؤشرات الدورة بعد تفعيل التحليلات"
+          />
         </div>
       )}
     </div>

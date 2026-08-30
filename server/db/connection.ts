@@ -1,8 +1,10 @@
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 
-let _db: ReturnType<typeof drizzle> | null = null;
 let _pool: mysql.Pool | null = null;
+
+const createDatabase = (pool: mysql.Pool) => drizzle(pool);
+let _db: ReturnType<typeof createDatabase> | null = null;
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
@@ -26,7 +28,7 @@ export async function getDb() {
         enableKeepAlive: true,
       });
 
-      _db = drizzle(_pool);
+      _db = createDatabase(_pool);
     } catch (error) {
       console.error("[Database] Connection pool initialization failed:", error);
       _db = null;
