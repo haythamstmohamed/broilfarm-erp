@@ -1,52 +1,69 @@
 import "dotenv/config";
-import type { IncomingMessage, ServerResponse } from "node:http";
-import { nodeHTTPRequestHandler } from "@trpc/server/adapters/node-http";
+import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "./routers";
 import { createContext } from "./_core/context";
 
-export default async function handler(
-  req: IncomingMessage & { query?: Record<string, any> },
-  res: ServerResponse
-) {
-  // CORS Headers
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-trpc-source");
-  res.setHeader("Access-Control-Allow-Credentials", "true");
+export const config = {
+  runtime: "nodejs",
+};
 
+export default async function handler(req: Request) {
+  const url = new URL(req.url);
+
+  // Health check
+  if (url.pathname === "/api/health" || url.pathname === "/health") {
+    return new Response(JSON.stringify({ status: "ok", timestamp: new Date().toISOString() }), {
+      status: 200,
+      headers: {
+        "content-type": "application/json",
+        "access-control-allow-origin": "*",
+      },
+    });
+  }
+
+  // Handle CORS preflight
   if (req.method === "OPTIONS") {
-    res.statusCode = 204;
-    res.end();
-    return;
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS",
+        "access-control-allow-headers": "Content-Type, Authorization, x-trpc-source",
+      },
+    });
   }
 
-  // Health check endpoint
-  if (req.url === "/api/health" || req.url === "/health") {
-    res.statusCode = 200;
-    res.setHeader("Content-Type", "application/json");
-    res.end(JSON.stringify({ status: "ok", timestamp: new Date().toISOString() }));
-    return;
-  }
-
-  // Resolve tRPC procedure path
-  let path = "";
-  if (req.query?.trpc) {
-    path = Array.isArray(req.query.trpc) ? req.query.trpc.join("/") : req.query.trpc;
-  } else if (req.query?.path) {
-    path = Array.isArray(req.query.path) ? req.query.path.join("/") : req.query.path;
-  } else if (req.url) {
-    const cleanUrl = req.url.split("?")[0] || "";
-    path = cleanUrl.replace(/^\/api\/trpc\/?/, "").replace(/^\/trpc\/?/, "").replace(/^\/api\/?/, "");
-  }
-
-  return nodeHTTPRequestHandler({
-    req: req as any,
-    res,
+  return fetchRequestHandler({
+    endpoint: "/api/trpc",
+    req,
     router: appRouter,
-    createContext: createContext as any,
-    path,
-    onError: ({ error, path: errPath }) => {
-      console.error(`[tRPC Error on ${errPath}]:`, error);
+    createContext: async (opts) => {
+      const headerMap: Record<string, string> = {};
+      opts.req.headers.forEach((v, k) => {
+        headerMap[k] = v;
+      });
+
+      return createContext({
+        req: {
+          headers: headerMap,
+          cookies: {},
+        } as any,
+        res: {
+          setHeader: (k: string, v: string) => opts.resHeaders.set(k, v),
+          cookie: () => {},
+        } as any,
+      });
+    },
+    onError: ({ error, path }) => {
+      console.error(`[tRPC Error on ${path}]:`, error);
+    },
+    responseMeta: () => {
+      return {
+        headers: {
+          "access-control-allow-origin": "*",
+          "access-control-allow-credentials": "true",
+        },
+      };
     },
   });
 }
