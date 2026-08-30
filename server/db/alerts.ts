@@ -93,9 +93,11 @@ export async function createAlert(farmId: number, alertInput: EvaluatedAlert, cy
   return created;
 }
 
-export async function scanAndSyncCycleAlerts(farmId: number, cycleId: number) {
+export async function scanAndSyncCycleAlerts(userId: number, farmId: number, cycleId: number) {
   const db = await getDb();
   if (!db) return [];
+
+  await requireFarmCapability(userId, farmId, "manage_farms");
 
   const [cycle] = await db.select().from(cycles).where(eq(cycles.id, cycleId)).limit(1);
   if (!cycle || cycle.status === "closed") return [];

@@ -106,9 +106,9 @@ export function generateCycleAuditReport(input: {
   const totalSalesEgp = totalSalesPiasters / 100;
   const totalExpensesEgp = totalExpensesPiasters / 100;
   const netProfitEgp = totalSalesEgp - totalExpensesEgp;
-  const costPerBirdEgp = calculateCostPerBird(totalExpensesEgp, liveBirds);
-  const costPerKgEgp = calculateCostPerKg(totalExpensesEgp, totalProducedKg);
-  const roiPercent = calculateRoi(totalSalesEgp, totalExpensesEgp);
+  const costPerBirdEgp = calculateCostPerBird(totalExpensesPiasters, liveBirds);
+  const costPerKgEgp = calculateCostPerKg(totalExpensesPiasters, totalProducedKg);
+  const roiPercent = calculateRoi(totalSalesPiasters, totalExpensesPiasters);
 
   // Daily log assembly
   let runningLoss = 0;

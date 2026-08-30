@@ -8,6 +8,8 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { validateCriticalEnv } from "./env";
+import { generalApiRateLimiter } from "./rateLimiter";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -29,6 +31,11 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  // Validate critical env variables (JWT_SECRET, DATABASE_URL)
+  if (process.env.NODE_ENV === "production") {
+    validateCriticalEnv();
+  }
+
   const app = express();
   const server = createServer(app);
   // Configure body parser with larger size limit for file uploads
@@ -36,6 +43,10 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+
+  // Rate limiter for API
+  app.use("/api/trpc", generalApiRateLimiter);
+
   // tRPC API
   app.use(
     "/api/trpc",

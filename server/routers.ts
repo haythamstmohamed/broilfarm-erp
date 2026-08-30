@@ -267,7 +267,7 @@ export const appRouter = router({
       .mutation(({ ctx, input }) => resolveAlert(ctx.user.id, input.alertId)),
     scan: protectedProcedure
       .input(z.object({ farmId: z.number().int().positive(), cycleId: z.number().int().positive() }))
-      .mutation(({ input }) => scanAndSyncCycleAlerts(input.farmId, input.cycleId)),
+      .mutation(({ ctx, input }) => scanAndSyncCycleAlerts(ctx.user.id, input.farmId, input.cycleId)),
   }),
   companies: router({
     get: protectedProcedure
@@ -454,7 +454,11 @@ export const appRouter = router({
           currentCount: z.number().int().min(0),
         })
       )
-      .query(({ input }) => checkResourceLimit("pro", input.resourceType, input.currentCount)),
+      .query(async ({ ctx, input }) => {
+        const company = ctx.user.companyId ? await getCompany(ctx.user.id, ctx.user.companyId) : null;
+        const plan = (company?.subscriptionPlan as any) || "free";
+        return checkResourceLimit(plan, input.resourceType, input.currentCount);
+      }),
   }),
   weather: router({
     forCycleDay: protectedProcedure.input(z.object({ cycleId: z.number().int().positive(), weatherDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) })).query(({ ctx, input }) => getCycleDayWeather(ctx.user.id, input)),
