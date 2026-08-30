@@ -453,7 +453,7 @@ var init_schema = __esm({
 
 // server/api.ts
 import "dotenv/config";
-import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
+import { nodeHTTPRequestHandler } from "@trpc/server/adapters/node-http";
 
 // shared/const.ts
 var COOKIE_NAME = "app_session_id";
@@ -4642,65 +4642,66 @@ async function createContext(opts) {
 }
 
 // server/api.ts
-var config = {
-  runtime: "nodejs"
-};
-async function handler(req) {
-  const url = new URL(req.url);
-  if (url.pathname === "/api/health" || url.pathname === "/health") {
-    return new Response(JSON.stringify({ status: "ok", timestamp: (/* @__PURE__ */ new Date()).toISOString() }), {
-      status: 200,
-      headers: {
-        "content-type": "application/json",
-        "access-control-allow-origin": "*"
-      }
-    });
-  }
-  if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        "access-control-allow-origin": "*",
-        "access-control-allow-methods": "GET, POST, OPTIONS",
-        "access-control-allow-headers": "Content-Type, Authorization, x-trpc-source"
-      }
-    });
-  }
-  return fetchRequestHandler({
-    endpoint: "/api/trpc",
-    req,
-    router: appRouter,
-    createContext: async (opts) => {
-      const headerMap = {};
-      opts.req.headers.forEach((v, k) => {
-        headerMap[k] = v;
-      });
-      return createContext({
-        req: {
-          headers: headerMap,
-          cookies: {}
-        },
-        res: {
-          setHeader: (k, v) => opts.resHeaders.set(k, v),
-          cookie: () => {
-          }
-        }
-      });
-    },
-    onError: ({ error, path }) => {
-      console.error(`[tRPC Error on ${path}]:`, error);
-    },
-    responseMeta: () => {
-      return {
-        headers: {
-          "access-control-allow-origin": "*",
-          "access-control-allow-credentials": "true"
-        }
-      };
+async function handler(req, res) {
+  try {
+    if (res.setHeader) {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-trpc-source");
+      res.setHeader("Access-Control-Allow-Credentials", "true");
     }
-  });
+    if (req.method === "OPTIONS") {
+      res.statusCode = 204;
+      res.end();
+      return;
+    }
+    const rawUrl = req.url || "/";
+    const parsedUrl = new URL(rawUrl, "http://localhost");
+    if (parsedUrl.pathname === "/api/health" || parsedUrl.pathname === "/health") {
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ status: "ok", timestamp: (/* @__PURE__ */ new Date()).toISOString() }));
+      return;
+    }
+    let path = "";
+    if (req.query?.trpc) {
+      path = Array.isArray(req.query.trpc) ? req.query.trpc.join("/") : req.query.trpc;
+    } else if (req.query?.path) {
+      path = Array.isArray(req.query.path) ? req.query.path.join("/") : req.query.path;
+    } else {
+      path = parsedUrl.pathname.replace(/^\/api\/trpc\/?/, "").replace(/^\/trpc\/?/, "").replace(/^\/api\/?/, "");
+    }
+    return await nodeHTTPRequestHandler({
+      req,
+      res,
+      router: appRouter,
+      createContext,
+      path,
+      onError: ({ error, path: errPath }) => {
+        console.error(`[tRPC Error on ${errPath}]:`, error);
+      }
+    });
+  } catch (fatalError) {
+    console.error("[Fatal Serverless Function Error Caught]:", fatalError);
+    if (!res.headersSent) {
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "application/json");
+      res.end(
+        JSON.stringify([
+          {
+            error: {
+              json: {
+                message: fatalError?.message || "\u062D\u062F\u062B \u062E\u0637\u0623 \u063A\u064A\u0631 \u0645\u062A\u0648\u0642\u0639 \u0641\u064A \u0627\u0644\u062E\u0627\u062F\u0645 \u0627\u0644\u0633\u062D\u0627\u0628\u064A",
+                code: -32603,
+                data: { code: "INTERNAL_SERVER_ERROR", httpStatus: 500 }
+              }
+            }
+          }
+        ])
+      );
+    }
+  }
 }
 export {
-  config,
   handler as default
 };
