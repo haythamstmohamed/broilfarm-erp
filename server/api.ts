@@ -84,12 +84,4 @@ app.use((err: any, req: any, res: any, next: any) => {
   ]);
 });
 
-export default function handler(req: any, res: any) {
-  return new Promise((resolve) => {
-    res.on("finish", resolve);
-    res.on("close", resolve);
-    app(req, res, () => {
-      resolve(undefined);
-    });
-  });
-}
+export default app;
