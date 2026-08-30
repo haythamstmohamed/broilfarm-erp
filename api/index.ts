@@ -16,6 +16,11 @@ const trpcMiddleware = createExpressMiddleware({
   },
 });
 
+// Health check endpoint
+app.get("/api/health", (_req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
 // tRPC request normalization middleware for Vercel
 app.use((req, res, next) => {
   let url = req.url || "/";
@@ -80,5 +85,11 @@ app.use((err: any, req: any, res: any, next: any) => {
 });
 
 export default function handler(req: any, res: any) {
-  return app(req, res);
+  return new Promise((resolve) => {
+    res.on("finish", resolve);
+    res.on("close", resolve);
+    app(req, res, () => {
+      resolve(undefined);
+    });
+  });
 }
