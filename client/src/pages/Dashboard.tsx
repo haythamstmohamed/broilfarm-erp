@@ -69,6 +69,42 @@ export default function Dashboard() {
     { enabled: !!activeFarmId }
   );
 
+  const lastRecord = cycleRecords[cycleRecords.length - 1];
+  const todayMortality = lastRecord ? lastRecord.mortality + lastRecord.culls : 0;
+  const todayFeedKg = lastRecord ? lastRecord.feedKg : 0;
+  const todayWaterLiters = lastRecord ? lastRecord.waterLiters : 0;
+  const prev3 = cycleRecords.slice(-4, -1);
+  const past3DaysAvgMortality =
+    prev3.length > 0
+      ? prev3.reduce((acc, r) => acc + r.mortality + r.culls, 0) / prev3.length
+      : todayMortality;
+
+  const anomalyQuery = trpc.intelligence.analyzeFlock.useQuery(
+    {
+      breed: "ross_308",
+      ageDays: Math.max(1, cycleAgeDays),
+      currentLiveBirds,
+      todayMortality,
+      past3DaysAvgMortality,
+      latestAvgWeightGrams: avgWeightGrams > 0 ? avgWeightGrams : undefined,
+      todayFeedKg,
+      todayWaterLiters,
+    },
+    { enabled: !!activeCycleId && cycleAgeDays > 0 }
+  );
+
+  const harvestQuery = trpc.intelligence.harvestOptimizer.useQuery(
+    {
+      breed: "ross_308",
+      ageDays: Math.max(1, cycleAgeDays),
+      currentAvgWeightGrams: avgWeightGrams > 0 ? avgWeightGrams : 1800,
+      feedPricePerKgEgp: 24.5,
+      liveChickenPricePerKgEgp: 78.0,
+      targetMarketWeightGrams: activeCycle?.targetMarketWeight || 2200,
+    },
+    { enabled: !!activeCycleId && cycleAgeDays > 0 }
+  );
+
   const resolveAlertMutation = trpc.alerts.resolve.useMutation({
     onSuccess: () => {
       toast.success("تم إغلاق التنبيه");
@@ -413,15 +449,137 @@ export default function Dashboard() {
         <EnvironmentalSensorsPanel farmId={activeFarm.id} houseId={cycleHouses[0].id} houseName={cycleHouses[0].name} />
       )}
 
-      {/* Tab 4: AI Intelligent Assistant */}
+      {/* Tab 4: AI Intelligent Assistant & Biological Decision Intelligence */}
       {activeTab === "ai" && (
-        <div className="max-w-3xl mx-auto">
-          <AIChatBox
-            messages={aiMessages}
-            onSendMessage={() => toast.info("طبقة التحليل الذكي التفاعلي لم تُفعّل بعد في هذه البيئة.")}
-            emptyStateMessage="لا توجد تحليلات جاهزة بعد."
-            placeholder="اسأل عن مؤشرات الدورة بعد تفعيل التحليلات"
-          />
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* Health Status & Risk Card */}
+          <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Bot className="w-6 h-6 text-primary" />
+                  <CardTitle className="text-xl">محلل الذكاء البيولوجي والتشغيلي للقطيع</CardTitle>
+                </div>
+                {anomalyQuery.data && (
+                  <Badge
+                    variant={
+                      anomalyQuery.data.overallRiskLevel === "critical"
+                        ? "destructive"
+                        : anomalyQuery.data.overallRiskLevel === "medium"
+                        ? "secondary"
+                        : "outline"
+                    }
+                    className="text-xs px-3 py-1 font-bold"
+                  >
+                    مستوى المخاطر: {anomalyQuery.data.overallRiskArabic}
+                  </Badge>
+                )}
+              </div>
+              <CardDescription>
+                تحليل تلقائي لأنماط النمو، النفوق، استهلاك المياه والعلف ومقارنتها بالسلالة القياسية
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {anomalyQuery.isLoading ? (
+                <p className="text-sm text-muted-foreground">جارٍ فحص وتحليل مؤشرات القطيع…</p>
+              ) : anomalyQuery.data && anomalyQuery.data.detectedAnomalies.length > 0 ? (
+                <div className="space-y-3">
+                  {anomalyQuery.data.detectedAnomalies.map((anomaly, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-4 rounded-xl border ${
+                        anomaly.severity === "critical"
+                          ? "bg-rose-500/10 border-rose-500/30 text-rose-950 dark:text-rose-200"
+                          : "bg-amber-500/10 border-amber-500/30 text-amber-950 dark:text-amber-200"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 font-bold text-base mb-1">
+                        <AlertTriangle className="w-5 h-5" />
+                        {anomaly.titleArabic}
+                      </div>
+                      <p className="text-sm mb-2 opacity-90">{anomaly.descriptionArabic}</p>
+                      <div className="text-xs font-semibold bg-background/60 p-2.5 rounded-lg border">
+                        <span className="text-primary font-bold">💡 التوصية التشغيلية: </span>
+                        {anomaly.recommendationArabic}
+                      </div>
+                      {anomaly.investigationQuestions.length > 0 && (
+                        <div className="mt-2.5 pt-2 border-t border-border/40 text-xs">
+                          <p className="font-bold mb-1">🔍 أسئلة للفحص الميداني والبيطري:</p>
+                          <ul className="list-disc list-inside space-y-0.5 opacity-90">
+                            {anomaly.investigationQuestions.map((q, qIdx) => (
+                              <li key={qIdx}>{q}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-6 text-center text-muted-foreground bg-emerald-500/5 rounded-xl border border-emerald-500/20">
+                  <ShieldCheck className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
+                  <p className="font-bold text-foreground">القطيع في حالة بيولوجية وإنتاجية ممتازة</p>
+                  <p className="text-xs mt-1">لا توجد أي أنماط شاذة في النفوق أو استهلاك المياه والعلف لهذا اليوم.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Harvest & Marketing Optimizer */}
+          {harvestQuery.data && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-primary" />
+                    <CardTitle className="text-lg">مستشار نافذة البيع والتسويق الاقتصادي</CardTitle>
+                  </div>
+                  <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">
+                    عمر {harvestQuery.data.currentAgeDays} يوم
+                  </Badge>
+                </div>
+                <CardDescription>
+                  تحديد التوقيت الأمثل للبيع بناءً على مقارنة قيمة الزيادة اليومية في الوزن بتكلفة العلف
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                  <div className="p-3 bg-muted/40 rounded-xl border">
+                    <p className="text-xs text-muted-foreground">الوزن الحالي</p>
+                    <p className="text-lg font-bold text-foreground">{harvestQuery.data.currentWeightGrams} جم</p>
+                  </div>
+                  <div className="p-3 bg-muted/40 rounded-xl border">
+                    <p className="text-xs text-muted-foreground">الوزن المستهدف</p>
+                    <p className="text-lg font-bold text-primary">{harvestQuery.data.targetWeightGrams} جم</p>
+                  </div>
+                  <div className="p-3 bg-muted/40 rounded-xl border">
+                    <p className="text-xs text-muted-foreground">العمر المتوقع للبيع</p>
+                    <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                      يوم {harvestQuery.data.estimatedOptimalHarvestDay}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-muted/40 rounded-xl border">
+                    <p className="text-xs text-muted-foreground">الربح التقديري/طائر</p>
+                    <p className="text-lg font-bold text-foreground">{harvestQuery.data.projectedProfitPerBirdEgp} ج.م</p>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-primary/5 rounded-xl border border-primary/20 text-sm">
+                  <p className="font-bold text-primary mb-1">📢 الرؤية الاقتصادية:</p>
+                  <p className="text-foreground">{harvestQuery.data.recommendationArabic}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Veterinary Notice */}
+          <div className="p-4 bg-muted/30 rounded-xl border text-xs text-muted-foreground flex items-center gap-3">
+            <ShieldCheck className="w-5 h-5 text-primary shrink-0" />
+            <p>
+              <strong>ملاحظة أمان بيطرية:</strong> هذه التحليلات تقدم مؤشرات تشغيلية مبنية على البيانات الرياضية للقطيع،
+              ولا تغني عن المعاينة الميدانية والتشخيص من الطبيب البيطري المعتمد للمزرعة.
+            </p>
+          </div>
         </div>
       )}
     </div>

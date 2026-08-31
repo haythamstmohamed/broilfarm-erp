@@ -4338,6 +4338,434 @@ var systemRouter = router({
   })
 });
 
+// shared/productionIntelligence.ts
+function getBreedTargetForDay(breed, day) {
+  const safeDay = Math.max(1, Math.min(50, Math.round(day)));
+  let factor = 1;
+  if (breed === "cobb_500") factor = 0.985;
+  else if (breed === "arbor_acres") factor = 0.99;
+  else if (breed === "hubbard") factor = 0.975;
+  const targetWeight = Math.round(
+    factor * (42 + 22 * safeDay + 1.25 * Math.pow(safeDay, 2) + 8e-3 * Math.pow(safeDay, 3))
+  );
+  const targetFcr = Number((0.85 + safeDay / 42 * 0.7).toFixed(2));
+  const cumulativeFeed = Math.round(targetWeight * targetFcr);
+  const dailyFeed = Math.round(cumulativeFeed / safeDay);
+  const dailyGain = Math.round((targetWeight - 42) / safeDay);
+  return {
+    ageDays: safeDay,
+    targetWeightGrams: targetWeight,
+    dailyGainGrams: dailyGain,
+    dailyFeedGrams: dailyFeed,
+    cumulativeFeedGrams: cumulativeFeed,
+    targetFcr
+  };
+}
+function calculateWeightUniformity(weightsGrams) {
+  if (!weightsGrams || weightsGrams.length < 3) return null;
+  const validWeights = weightsGrams.filter((w) => typeof w === "number" && w > 0);
+  const n = validWeights.length;
+  if (n < 3) return null;
+  const sum = validWeights.reduce((acc, w) => acc + w, 0);
+  const mean = sum / n;
+  const variance = validWeights.reduce((acc, w) => acc + Math.pow(w - mean, 2), 0) / (n - 1);
+  const stdDev = Math.sqrt(variance);
+  const cvPct = Number((stdDev / mean * 100).toFixed(2));
+  const lowerBound = mean * 0.9;
+  const upperBound = mean * 1.1;
+  const withinRangeCount = validWeights.filter((w) => w >= lowerBound && w <= upperBound).length;
+  const uniformityPct = Number((withinRangeCount / n * 100).toFixed(2));
+  let flockGrade = "good";
+  let flockGradeArabic = "\u062C\u064A\u062F";
+  let recommendation = "\u062A\u062C\u0627\u0646\u0633 \u0637\u0628\u064A\u0639\u064A\u060C \u0627\u0633\u062A\u0645\u0631 \u0639\u0644\u0649 \u0628\u0631\u0646\u0627\u0645\u062C \u0627\u0644\u062A\u063A\u0630\u064A\u0629 \u0648\u0627\u0644\u0645\u0633\u0627\u062D\u0627\u062A \u0627\u0644\u062D\u0627\u0644\u064A\u0629.";
+  if (cvPct <= 7.5 || uniformityPct >= 88) {
+    flockGrade = "world_class";
+    flockGradeArabic = "\u0645\u0645\u062A\u0627\u0632 \u0639\u0627\u0644\u0645\u064A (\u062A\u0648\u0632\u064A\u0639 \u0641\u0627\u0626\u0642 \u0627\u0644\u062A\u062C\u0627\u0646\u0633)";
+    recommendation = "\u062A\u062C\u0627\u0646\u0633 \u0645\u062B\u0627\u0644\u064A \u0644\u0644\u0642\u0637\u064A\u0639. \u0643\u0641\u0627\u0621\u0629 \u0639\u0627\u0644\u064A\u0629 \u0641\u064A \u062A\u0648\u0632\u064A\u0639 \u062E\u0637\u0648\u0637 \u0627\u0644\u0639\u0644\u0641 \u0648\u0645\u0633\u0627\u062D\u0627\u062A \u0627\u0644\u0639\u0646\u0627\u0628\u0631.";
+  } else if (cvPct <= 9.5 || uniformityPct >= 80) {
+    flockGrade = "excellent";
+    flockGradeArabic = "\u0645\u0645\u062A\u0627\u0632";
+    recommendation = "\u062A\u062C\u0627\u0646\u0633 \u0639\u0627\u0644\u064A \u062C\u062F\u0627\u064B. \u064A\u0633\u0627\u0639\u062F \u0639\u0644\u0649 \u0627\u0633\u062A\u0642\u0631\u0627\u0631 \u0645\u062A\u0648\u0633\u0637 \u0627\u0644\u0648\u0632\u0646 \u0639\u0646\u062F \u0627\u0644\u0630\u0628\u062D.";
+  } else if (cvPct <= 12 || uniformityPct >= 70) {
+    flockGrade = "good";
+    flockGradeArabic = "\u062C\u064A\u062F (\u0645\u0642\u0628\u0648\u0644)";
+    recommendation = "\u062A\u062C\u0627\u0646\u0633 \u0645\u0642\u0628\u0648\u0644. \u064A\u0641\u0636\u0644 \u0641\u062D\u0635 \u062A\u0648\u0632\u064A\u0639 \u0623\u0637\u0628\u0627\u0642 \u0627\u0644\u0639\u0644\u0641 \u0648\u0633\u0631\u0639\u0629 \u0627\u0644\u062A\u063A\u0630\u064A\u0629.";
+  } else if (cvPct <= 14.5 || uniformityPct >= 60) {
+    flockGrade = "moderate";
+    flockGradeArabic = "\u0645\u062A\u0648\u0633\u0637 (\u062A\u0641\u0627\u0648\u062A \u0645\u0644\u062D\u0648\u0638)";
+    recommendation = "\u062A\u0641\u0627\u0648\u062A \u0628\u064A\u0646 \u0623\u062D\u062C\u0627\u0645 \u0627\u0644\u0637\u064A\u0648\u0631. \u062A\u062D\u0642\u0642 \u0645\u0646 \u0636\u063A\u0637 \u0627\u0644\u0645\u064A\u0627\u0647 \u0648\u0633\u0639\u0629 \u0627\u0644\u0639\u0644\u0627\u0641\u0627\u062A \u0648\u0627\u0644\u062A\u0647\u0648\u064A\u0629.";
+  } else {
+    flockGrade = "poor";
+    flockGradeArabic = "\u0636\u0639\u064A\u0641 (\u062A\u0641\u0627\u0648\u062A \u062D\u0627\u062F)";
+    recommendation = "\u062A\u0641\u0627\u0648\u062A \u0634\u062F\u064A\u062F \u0641\u064A \u0627\u0644\u0623\u0648\u0632\u0627\u0646. \u064A\u0644\u0632\u0645 \u0641\u0631\u0632 \u0627\u0644\u0637\u064A\u0648\u0631 \u0627\u0644\u0635\u063A\u064A\u0631\u0629 \u0648\u0645\u0631\u0627\u062C\u0639\u0629 \u0628\u0631\u0646\u0627\u0645\u062C \u0627\u0644\u062A\u062D\u0636\u064A\u0646 \u0648\u0643\u062B\u0627\u0641\u0629 \u0627\u0644\u0637\u064A\u0648\u0631.";
+  }
+  return {
+    sampleCount: n,
+    meanWeightGrams: Math.round(mean),
+    standardDeviationGrams: Math.round(stdDev),
+    cvPercentage: cvPct,
+    uniformityPercentage: uniformityPct,
+    flockGrade,
+    flockGradeArabic,
+    recommendation
+  };
+}
+function evaluateWaterToFeedRatio(waterLiters, feedKg, ambientTempC = 24) {
+  if (feedKg <= 0 || waterLiters <= 0) {
+    return {
+      ratio: 0,
+      status: "optimal",
+      statusArabic: "\u063A\u064A\u0631 \u0645\u062A\u0648\u0641\u0631",
+      tone: "blue",
+      diagnostic: "\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0627\u0633\u062A\u0647\u0644\u0627\u0643 \u063A\u064A\u0631 \u0643\u0627\u0641\u064A\u0629 \u0644\u062A\u0642\u064A\u064A\u0645 \u0627\u0644\u0646\u0633\u0628\u0629."
+    };
+  }
+  const ratio = Number((waterLiters / feedKg).toFixed(2));
+  const tempAdjustedMax = ambientTempC > 28 ? 2.4 : ambientTempC > 24 ? 2.1 : 1.95;
+  if (ratio < 1.45) {
+    return {
+      ratio,
+      status: "low",
+      statusArabic: "\u0627\u0633\u062A\u0647\u0644\u0627\u0643 \u0645\u064A\u0627\u0647 \u0645\u0646\u062E\u0641\u0636",
+      tone: "amber",
+      diagnostic: "\u0627\u0633\u062A\u0647\u0644\u0627\u0643 \u0627\u0644\u0645\u064A\u0627\u0647 \u0623\u0642\u0644 \u0645\u0646 \u0627\u0644\u0645\u0639\u062F\u0644 \u0627\u0644\u0637\u0628\u064A\u0639\u064A. \u0627\u0641\u062D\u0635 \u0636\u063A\u0637 \u0627\u0644\u0646\u0628\u0644\u060C \u0641\u0644\u062A\u0631 \u0627\u0644\u0645\u064A\u0627\u0647\u060C \u0623\u0648 \u0627\u0646\u0633\u062F\u0627\u062F \u0627\u0644\u062E\u0637\u0648\u0637."
+    };
+  }
+  if (ratio <= tempAdjustedMax) {
+    return {
+      ratio,
+      status: "optimal",
+      statusArabic: "\u0645\u0639\u062F\u0644 \u0645\u062B\u0627\u0644\u064A",
+      tone: "emerald",
+      diagnostic: "\u0646\u0633\u0628\u0629 \u0627\u0633\u062A\u0647\u0644\u0627\u0643 \u0627\u0644\u0645\u064A\u0627\u0647 \u0625\u0644\u0649 \u0627\u0644\u0639\u0644\u0641 \u0645\u062A\u0648\u0627\u0632\u0646\u0629 \u0648\u0645\u062B\u0627\u0644\u064A\u0629 \u0644\u0644\u0646\u0645\u0648 \u0627\u0644\u0633\u0644\u064A\u0645."
+    };
+  }
+  if (ratio <= tempAdjustedMax + 0.35) {
+    return {
+      ratio,
+      status: "elevated",
+      statusArabic: "\u0627\u0633\u062A\u0647\u0644\u0627\u0643 \u0645\u064A\u0627\u0647 \u0645\u0631\u062A\u0641\u0639",
+      tone: "amber",
+      diagnostic: "\u0627\u0633\u062A\u0647\u0644\u0627\u0643 \u0645\u064A\u0627\u0647 \u0623\u0639\u0644\u0649 \u0645\u0646 \u0627\u0644\u0645\u0639\u062A\u0627\u062F. \u0642\u062F \u064A\u0643\u0648\u0646 \u0646\u0627\u062A\u062C\u0627\u064B \u0639\u0646 \u0627\u0631\u062A\u0641\u0627\u0639 \u062D\u0631\u0627\u0631\u0629 \u0627\u0644\u0639\u0646\u0628\u0631 \u0623\u0648 \u0632\u064A\u0627\u062F\u0629 \u0645\u0644\u0648\u062D\u0629 \u0627\u0644\u0639\u0644\u0641."
+    };
+  }
+  return {
+    ratio,
+    status: "critical_high",
+    statusArabic: "\u0627\u0633\u062A\u0647\u0644\u0627\u0643 \u0645\u064A\u0627\u0647 \u0634\u062F\u064A\u062F \u0627\u0644\u0627\u0631\u062A\u0641\u0627\u0639",
+    tone: "rose",
+    diagnostic: "\u0627\u0633\u062A\u0647\u0644\u0627\u0643 \u0645\u0627\u0621 \u0645\u0641\u0631\u0637. \u0627\u062D\u062A\u0645\u0627\u0644 \u0648\u062C\u0648\u062F \u062A\u0633\u0631\u064A\u0628 \u0641\u064A \u062E\u0637\u0648\u0637 \u0627\u0644\u0646\u0628\u0644 \u0623\u0648 \u0625\u0635\u0627\u0628\u0629 \u0645\u0639\u0648\u064A\u0629 (\u0625\u0633\u0647\u0627\u0644\u0627\u062A/\u0643\u0648\u0643\u0633\u064A\u062F\u064A\u0627)."
+  };
+}
+function calculateAdvancedEpef({
+  birdsPlaced,
+  totalMortality,
+  averageWeightGrams,
+  actualFcr,
+  ageDays
+}) {
+  if (birdsPlaced <= 0 || ageDays <= 0 || actualFcr <= 0 || averageWeightGrams <= 0) {
+    return null;
+  }
+  const livabilityPct = Number(Math.max(0, (birdsPlaced - totalMortality) / birdsPlaced * 100).toFixed(2));
+  const avgWeightKg = averageWeightGrams / 1e3;
+  const adg = Number((averageWeightGrams / ageDays).toFixed(1));
+  const epef = Math.round(livabilityPct * avgWeightKg * 100 / (ageDays * actualFcr));
+  const performanceIndex = Number((livabilityPct * avgWeightKg / actualFcr).toFixed(1));
+  const adjustedFcr = Number((actualFcr - (avgWeightKg - 2) * 0.33).toFixed(2));
+  let grade = "good";
+  let ratingArabic = "\u062C\u064A\u062F";
+  if (epef >= 400) {
+    grade = "world_class";
+    ratingArabic = "\u0639\u0627\u0644\u0645\u064A \u0645\u0645\u062A\u0627\u0632 \u2B50\u2B50\u2B50";
+  } else if (epef >= 350) {
+    grade = "excellent";
+    ratingArabic = "\u0645\u0645\u062A\u0627\u0632 \u2B50\u2B50";
+  } else if (epef >= 300) {
+    grade = "good";
+    ratingArabic = "\u062C\u064A\u062F \u062C\u062F\u0627\u064B \u2B50";
+  } else if (epef >= 250) {
+    grade = "average";
+    ratingArabic = "\u0645\u062A\u0648\u0633\u0637";
+  } else {
+    grade = "poor";
+    ratingArabic = "\u062F\u0648\u0646 \u0627\u0644\u0645\u062A\u0648\u0642\u0639";
+  }
+  return {
+    epefScore: epef,
+    ratingArabic,
+    grade,
+    adjustedFcr2kg: Math.max(0.8, adjustedFcr),
+    performanceIndex,
+    livabilityPercentage: livabilityPct,
+    averageDailyGainGrams: adg
+  };
+}
+
+// shared/decisionIntelligence.ts
+function analyzeFlockAnomalies(params) {
+  const {
+    breed,
+    ageDays,
+    currentLiveBirds,
+    todayMortality,
+    past3DaysAvgMortality,
+    latestAvgWeightGrams,
+    todayFeedKg,
+    todayWaterLiters,
+    ambientTempC = 24
+  } = params;
+  const anomalies = [];
+  const target = getBreedTargetForDay(breed, ageDays);
+  if (currentLiveBirds > 0) {
+    const dailyMortalityRate = todayMortality / currentLiveBirds * 100;
+    const isSpike = past3DaysAvgMortality > 0 && todayMortality >= past3DaysAvgMortality * 2.2 && todayMortality >= 10;
+    if (dailyMortalityRate >= 0.3 || isSpike && dailyMortalityRate >= 0.2) {
+      anomalies.push({
+        type: "mortality_spike",
+        severity: "critical",
+        titleArabic: "\u0627\u0631\u062A\u0641\u0627\u0639 \u062D\u0627\u062F \u0648\u063A\u064A\u0631 \u0645\u0633\u0628\u0648\u0642 \u0641\u064A \u0646\u0633\u0628\u0629 \u0627\u0644\u0646\u0641\u0648\u0642 \u0627\u0644\u064A\u0648\u0645\u064A",
+        descriptionArabic: `\u062A\u0645 \u062A\u0633\u062C\u064A\u0644 ${todayMortality} \u0646\u0627\u0641\u0642 \u0627\u0644\u064A\u0648\u0645 (${dailyMortalityRate.toFixed(2)}%) \u0648\u0647\u0648 \u0623\u0639\u0644\u0649 \u0645\u0646 \u0627\u0644\u0645\u0639\u062F\u0644 \u0627\u0644\u0637\u0628\u064A\u0639\u064A \u0628\u0623\u0643\u062B\u0631 \u0645\u0646 \u0627\u0644\u0636\u0639\u0641.`,
+        recommendationArabic: "\u062A\u0634\u0631\u064A\u062D \u0639\u064A\u0646\u0627\u062A \u0637\u0627\u0632\u062C\u0629 \u0641\u0648\u0631\u0627\u064B \u0628\u0648\u0627\u0633\u0637\u0629 \u0627\u0644\u0637\u0628\u064A\u0628 \u0627\u0644\u0628\u064A\u0637\u0631\u064A\u060C \u0641\u062D\u0635 \u0633\u0644\u0627\u0645\u0629 \u0627\u0644\u062A\u0647\u0648\u064A\u0629\u060C \u0648\u0627\u0644\u062A\u0623\u0643\u062F \u0645\u0646 \u0639\u062F\u0645 \u0648\u062C\u0648\u062F \u0633\u0645\u0648\u0645 \u0641\u0637\u0631\u064A\u0629 \u0628\u0627\u0644\u0639\u0644\u0641.",
+        investigationQuestions: [
+          "\u0647\u0644 \u062A\u0648\u062C\u062F \u0623\u0639\u0631\u0627\u0636 \u062A\u0646\u0641\u0633\u064A\u0629 (\u0635\u0648\u062A \u062E\u062E\u0634\u062E\u0629/\u0625\u0641\u0631\u0627\u0632\u0627\u062A) \u0623\u0648 \u0625\u0633\u0647\u0627\u0644\u0627\u062A \u0645\u0644\u0648\u0646\u0629 \u0641\u064A \u0627\u0644\u0641\u0631\u0634\u0629\u061F",
+          "\u0647\u0644 \u062D\u062F\u062B \u0627\u0646\u0642\u0637\u0627\u0639 \u0645\u0641\u0627\u062C\u0626 \u0641\u064A \u0627\u0644\u062A\u064A\u0627\u0631 \u0627\u0644\u0643\u0647\u0631\u0628\u0627\u0626\u064A \u0623\u0648 \u062A\u0648\u0642\u0641 \u0634\u0641\u0627\u0637\u0627\u062A \u0627\u0644\u062A\u0647\u0648\u064A\u0629 \u0644\u064A\u0644\u0627\u064B\u061F",
+          "\u0647\u0644 \u062A\u0645 \u0641\u062A\u062D \u0634\u0643\u0627\u0626\u0631 \u0639\u0644\u0641 \u0645\u0646 \u062A\u0634\u063A\u064A\u0644\u0629 \u0623\u0648 \u0645\u0648\u0631\u062F \u062C\u062F\u064A\u062F \u062E\u0644\u0627\u0644 \u0627\u0644\u0640 48 \u0633\u0627\u0639\u0629 \u0627\u0644\u0645\u0627\u0636\u064A\u0629\u061F"
+        ]
+      });
+    } else if (dailyMortalityRate >= 0.15 && ageDays > 10) {
+      anomalies.push({
+        type: "mortality_spike",
+        severity: "warning",
+        titleArabic: "\u062A\u0632\u0627\u064A\u062F \u0645\u0644\u062D\u0648\u0638 \u0641\u064A \u0645\u0639\u062F\u0644 \u0627\u0644\u0646\u0641\u0648\u0642",
+        descriptionArabic: `\u0646\u0633\u0628\u0629 \u0627\u0644\u0646\u0641\u0648\u0642 \u0627\u0644\u064A\u0648\u0645\u064A \u0628\u0644\u063A\u062A ${dailyMortalityRate.toFixed(2)}%\u060C \u064A\u0641\u0636\u0644 \u0627\u0644\u0645\u062A\u0627\u0628\u0639\u0629 \u0627\u0644\u062F\u0642\u064A\u0642\u0629.`,
+        recommendationArabic: "\u0641\u062D\u0635 \u062D\u0631\u0627\u0631\u0629 \u0627\u0644\u0639\u0646\u0628\u0631 \u0648\u062A\u062C\u0627\u0646\u0633 \u062A\u0648\u0632\u064A\u0639 \u0627\u0644\u0637\u064A\u0648\u0631 \u0628\u064A\u0646 \u0627\u0644\u0623\u062F\u0648\u0627\u0631 \u0648\u0645\u0631\u0627\u062C\u0639\u0629 \u0628\u0631\u0646\u0627\u0645\u062C \u0627\u0644\u062A\u062D\u0635\u064A\u0646.",
+        investigationQuestions: ["\u0647\u0644 \u062A\u0631\u062A\u0641\u0639 \u0646\u0633\u0628\u0629 \u0627\u0644\u0646\u0641\u0648\u0642 \u0641\u064A \u0627\u0644\u062F\u0648\u0631 \u0627\u0644\u0639\u0644\u0648\u064A \u0623\u0648 \u0627\u0644\u0623\u0631\u0636\u064A \u062A\u062D\u062F\u064A\u062F\u0627\u064B\u061F"]
+      });
+    }
+  }
+  if (latestAvgWeightGrams && latestAvgWeightGrams > 0) {
+    const weightRatio = latestAvgWeightGrams / target.targetWeightGrams;
+    if (weightRatio < 0.88) {
+      anomalies.push({
+        type: "growth_stunting",
+        severity: "critical",
+        titleArabic: "\u062A\u0623\u062E\u0631 \u062D\u0627\u062F \u0641\u064A \u0645\u062A\u0648\u0633\u0637 \u0648\u0632\u0646 \u0627\u0644\u0642\u0637\u064A\u0639 \u0645\u0642\u0627\u0631\u0646\u0629 \u0628\u0627\u0644\u0633\u0644\u0627\u0644\u0629",
+        descriptionArabic: `\u0627\u0644\u0648\u0632\u0646 \u0627\u0644\u062D\u0627\u0644\u064A (${latestAvgWeightGrams} \u062C\u0645) \u064A\u0642\u0644 \u0628\u0646\u0633\u0628\u0629 ${(100 - weightRatio * 100).toFixed(1)}% \u0639\u0646 \u0627\u0644\u0648\u0632\u0646 \u0627\u0644\u0645\u0633\u062A\u0647\u062F\u0641 \u0644\u0633\u0644\u0627\u0644\u0629 ${breed} (${target.targetWeightGrams} \u062C\u0645).`,
+        recommendationArabic: "\u0645\u0631\u0627\u062C\u0639\u0629 \u0643\u0641\u0627\u0621\u0629 \u0647\u0636\u0645 \u0627\u0644\u0639\u0644\u0641\u060C \u0632\u064A\u0627\u062F\u0629 \u0639\u062F\u062F \u0648\u062C\u0628\u0627\u062A \u0627\u0644\u062A\u063A\u0630\u064A\u0629\u060C \u0648\u0627\u0644\u062A\u0623\u0643\u062F \u0645\u0646 \u0639\u062F\u0645 \u0648\u062C\u0648\u062F \u062A\u0632\u0627\u062D\u0645 \u0641\u064A \u0627\u0644\u0639\u0644\u0627\u0641\u0627\u062A.",
+        investigationQuestions: [
+          "\u0647\u0644 \u062A\u0643\u0641\u064A \u0623\u0637\u0648\u0627\u0644 \u062E\u0637\u0648\u0637 \u0627\u0644\u0639\u0644\u0627\u0641\u0627\u062A \u0644\u062C\u0645\u064A\u0639 \u0627\u0644\u0637\u064A\u0648\u0631 \u0641\u064A \u0646\u0641\u0633 \u0627\u0644\u0648\u0642\u062A\u061F",
+          "\u0647\u0644 \u062A\u0645 \u0642\u064A\u0627\u0633 \u0637\u0627\u0642\u0629 \u0648\u0628\u0631\u0648\u062A\u064A\u0646 \u0627\u0644\u0639\u0644\u0641 \u0641\u064A \u0627\u0644\u0645\u0639\u0645\u0644 \u0644\u0644\u062A\u0623\u0643\u062F \u0645\u0646 \u0645\u0637\u0627\u0628\u0642\u0629 \u0627\u0644\u0645\u0648\u0627\u0635\u0641\u0627\u062A\u061F"
+        ]
+      });
+    } else if (weightRatio < 0.94) {
+      anomalies.push({
+        type: "growth_stunting",
+        severity: "warning",
+        titleArabic: "\u062A\u0623\u062E\u0631 \u0637\u0641\u064A\u0641 \u0641\u064A \u0645\u0639\u062F\u0644 \u0627\u0644\u062A\u062D\u0648\u064A\u0644 \u0627\u0644\u0648\u0632\u0646\u064A",
+        descriptionArabic: `\u0627\u0644\u0648\u0632\u0646 \u0623\u0642\u0644 \u0628\u0646\u0633\u0628\u0629 ${(100 - weightRatio * 100).toFixed(1)}% \u0639\u0646 \u0627\u0644\u0645\u0639\u064A\u0627\u0631 \u0627\u0644\u0642\u064A\u0627\u0633\u064A.`,
+        recommendationArabic: "\u0625\u0636\u0627\u0641\u0629 \u0645\u0646\u0634\u0637\u0627\u062A \u0646\u0645\u0648 \u0648\u0623\u062D\u0645\u0627\u0636 \u0639\u0636\u0648\u064A\u0629 \u0641\u064A \u0645\u064A\u0627\u0647 \u0627\u0644\u0634\u0631\u0628 \u0648\u0641\u062D\u0635 \u0633\u0631\u0639\u0629 \u0633\u062D\u0628 \u0627\u0644\u0639\u0644\u0641.",
+        investigationQuestions: ["\u0647\u0644 \u062C\u0648\u062F\u0629 \u0648\u0646\u0642\u0627\u0621 \u0645\u064A\u0627\u0647 \u0627\u0644\u0634\u0631\u0628 \u0645\u0637\u0627\u0628\u0642\u0629 \u0644\u0644\u0645\u0648\u0627\u0635\u0641\u0627\u062A \u0627\u0644\u0642\u064A\u0627\u0633\u064A\u0629\u061F"]
+      });
+    }
+  }
+  if (todayFeedKg > 0 && todayWaterLiters > 0) {
+    const waterAssessment = evaluateWaterToFeedRatio(todayWaterLiters, todayFeedKg, ambientTempC);
+    if (waterAssessment.status === "critical_high" || waterAssessment.status === "low") {
+      anomalies.push({
+        type: "water_imbalance",
+        severity: waterAssessment.status === "critical_high" ? "critical" : "warning",
+        titleArabic: `\u0634\u0630\u0648\u0630 \u0641\u064A \u0627\u0633\u062A\u0647\u0644\u0627\u0643 \u0627\u0644\u0645\u064A\u0627\u0647 (${waterAssessment.statusArabic})`,
+        descriptionArabic: waterAssessment.diagnostic,
+        recommendationArabic: "\u0641\u062D\u0635 \u0636\u063A\u0637 \u062E\u0637\u0648\u0637 \u0627\u0644\u0646\u064A\u0628\u0644\u060C \u0635\u064A\u0627\u0646\u0629 \u0627\u0644\u0641\u0644\u0627\u062A\u0631\u060C \u0648\u0627\u0644\u062A\u0623\u0643\u062F \u0645\u0646 \u062E\u0644\u0648 \u0627\u0644\u0645\u064A\u0627\u0647 \u0645\u0646 \u0627\u0644\u0645\u0644\u0648\u062D\u0629 \u0627\u0644\u0645\u0641\u0631\u0637\u0629.",
+        investigationQuestions: [
+          "\u0647\u0644 \u064A\u0648\u062C\u062F \u0628\u0644\u0644 \u0645\u0644\u062D\u0648\u0638 \u062A\u062D\u062A \u062E\u0637\u0648\u0637 \u0627\u0644\u0646\u064A\u0628\u0644 \u064A\u0634\u064A\u0631 \u0644\u062A\u0633\u0631\u064A\u0628\u061F",
+          "\u0647\u0644 \u062A\u0645 \u062A\u0646\u0638\u064A\u0641 \u0648\u062A\u0637\u0647\u064A\u0631 \u062E\u0637\u0648\u0637 \u0627\u0644\u0645\u064A\u0627\u0647 \u0628\u0645\u0627\u062F\u0629 \u0645\u0639\u0642\u0645\u0629 \u0645\u0624\u062E\u0631\u0627\u064B\u061F"
+        ]
+      });
+    }
+  }
+  if (ambientTempC >= 33 && ageDays > 20) {
+    anomalies.push({
+      type: "heat_stress",
+      severity: "critical",
+      titleArabic: "\u062E\u0637\u0631 \u0625\u062C\u0647\u0627\u062F \u062D\u0631\u0627\u0631\u064A \u062D\u0627\u062F \u0639\u0644\u0649 \u0627\u0644\u0642\u0637\u064A\u0639",
+      descriptionArabic: `\u062F\u0631\u062C\u0629 \u0627\u0644\u062D\u0631\u0627\u0631\u0629 \u0627\u0644\u0645\u0633\u062C\u0644\u0629 (${ambientTempC}\xB0C) \u062A\u0641\u0648\u0642 \u0642\u062F\u0631\u0629 \u0627\u0644\u0637\u064A\u0648\u0631 \u0627\u0644\u0643\u0628\u064A\u0631\u0629 \u0639\u0644\u0649 \u0627\u0644\u062A\u0628\u0631\u064A\u062F \u0627\u0644\u0630\u0627\u062A\u064A.`,
+      recommendationArabic: "\u062A\u0634\u063A\u064A\u0644 \u062E\u0644\u0627\u064A\u0627 \u0627\u0644\u062A\u0628\u0631\u064A\u062F \u0648\u0623\u0642\u0635\u0649 \u0637\u0627\u0642\u0629 \u0644\u0644\u0634\u0641\u0627\u0637\u0627\u062A\u060C \u0625\u0636\u0627\u0641\u0629 \u0641\u064A\u062A\u0627\u0645\u064A\u0646 C \u0648\u0627\u0644\u0643\u062A\u0631\u0648\u0644\u0627\u064A\u062A \u0641\u064A \u0627\u0644\u0645\u0627\u0621\u060C \u0648\u0631\u0641\u0639 \u0627\u0644\u0639\u0644\u0641 \u0641\u064A \u0633\u0627\u0639\u0627\u062A \u0627\u0644\u0630\u0631\u0648\u0629.",
+      investigationQuestions: [
+        "\u0647\u0644 \u062A\u0639\u0645\u0644 \u0644\u0648\u062D\u0627\u062A \u0627\u0644\u062A\u0628\u0631\u064A\u062F \u0628\u0643\u0627\u0645\u0644 \u062A\u062F\u0641\u0642 \u0627\u0644\u0645\u064A\u0627\u0647 \u0648\u0628\u062F\u0648\u0646 \u0627\u0646\u0633\u062F\u0627\u062F\u0627\u062A\u061F",
+        "\u0647\u0644 \u062A\u0645 \u062A\u0641\u0639\u064A\u0644 \u062E\u0637\u0629 \u0627\u0644\u0637\u0648\u0627\u0631\u0626 \u0644\u0644\u0645\u0648\u0644\u062F \u0627\u0644\u0643\u0647\u0631\u0628\u0627\u0626\u064A \u0627\u0644\u0627\u062D\u062A\u064A\u0627\u0637\u064A\u061F"
+      ]
+    });
+  }
+  const hasCritical = anomalies.some((a) => a.severity === "critical");
+  const overallRiskLevel = hasCritical ? "critical" : anomalies.length > 0 ? "medium" : "low";
+  const overallRiskArabic = overallRiskLevel === "critical" ? "\u0645\u0631\u062A\u0641\u0639 \u062C\u062F\u0627\u064B (\u064A\u062A\u0637\u0644\u0628 \u062A\u062F\u062E\u0644\u0627\u064B \u0641\u0648\u0631\u064A\u0627\u064B \u{1F534})" : overallRiskLevel === "medium" ? "\u0645\u062A\u0648\u0633\u0637 (\u064A\u062D\u062A\u0627\u062C \u0645\u062A\u0627\u0628\u0639\u0629 \u0648\u0625\u062C\u0631\u0627\u0621\u0627\u062A \u0648\u0642\u0627\u0626\u064A\u0629 \u{1F7E1})" : "\u0645\u0646\u062E\u0641\u0636 \u0648\u0645\u0633\u062A\u0642\u0631 (\u062D\u0627\u0644\u0629 \u0627\u0644\u0642\u0637\u064A\u0639 \u0645\u0645\u062A\u0627\u0632\u0629 \u{1F7E2})";
+  return {
+    overallRiskLevel,
+    overallRiskArabic,
+    detectedAnomalies: anomalies
+  };
+}
+function calculateOptimalHarvestWindow(params) {
+  const {
+    breed,
+    ageDays,
+    currentAvgWeightGrams,
+    feedPricePerKgEgp,
+    liveChickenPricePerKgEgp,
+    targetMarketWeightGrams = 2200
+  } = params;
+  const currentTarget = getBreedTargetForDay(breed, ageDays);
+  const dailyGainKg = (currentTarget.dailyGainGrams || 85) / 1e3;
+  const dailyFeedKg = (currentTarget.dailyFeedGrams || 170) / 1e3;
+  const dailyMarginalGainEgp = Number((dailyGainKg * liveChickenPricePerKgEgp).toFixed(2));
+  const dailyFeedCostEgp = Number((dailyFeedKg * feedPricePerKgEgp).toFixed(2));
+  const estimatedDaysToTarget = Math.max(
+    0,
+    Math.ceil((targetMarketWeightGrams - currentAvgWeightGrams) / (dailyGainKg * 1e3))
+  );
+  const estimatedOptimalHarvestDay = ageDays + estimatedDaysToTarget;
+  const birdValueEgp = currentAvgWeightGrams / 1e3 * liveChickenPricePerKgEgp;
+  const projectedProfitPerBirdEgp = Number((birdValueEgp * 0.18).toFixed(2));
+  let status = "growing";
+  let recommendationArabic = `\u0627\u0644\u0642\u0637\u064A\u0639 \u0641\u064A \u0645\u0631\u062D\u0644\u0629 \u0627\u0644\u0646\u0645\u0648 \u0627\u0644\u0633\u0631\u064A\u0639. \u0627\u0644\u0648\u0642\u062A \u0627\u0644\u0645\u062A\u0648\u0642\u0639 \u0644\u0644\u0648\u0635\u0648\u0644 \u0644\u0644\u0648\u0632\u0646 \u0627\u0644\u062A\u0633\u0648\u064A\u0642\u064A (${targetMarketWeightGrams} \u062C\u0645) \u0647\u0648 \u0639\u0645\u0631 ${estimatedOptimalHarvestDay} \u064A\u0648\u0645.`;
+  if (currentAvgWeightGrams >= targetMarketWeightGrams && dailyMarginalGainEgp <= dailyFeedCostEgp) {
+    status = "past_optimal";
+    recommendationArabic = "\u062A\u062C\u0627\u0648\u0632 \u0627\u0644\u0642\u0637\u064A\u0639 \u0646\u0642\u0637\u0629 \u0627\u0644\u062A\u062D\u0648\u064A\u0644 \u0627\u0644\u0627\u0642\u062A\u0635\u0627\u062F\u064A \u0627\u0644\u0623\u0645\u062B\u0644 (\u062A\u0643\u0644\u0641\u0629 \u0627\u0644\u0639\u0644\u0641 \u0627\u0644\u064A\u0648\u0645\u064A \u062A\u0641\u0648\u0642 \u0642\u064A\u0645\u0629 \u0627\u0644\u0632\u064A\u0627\u062F\u0629 \u0627\u0644\u0648\u0632\u0646\u064A\u0629). \u064A\u0648\u0635\u0649 \u0628\u0628\u062F\u0621 \u0627\u0644\u0628\u064A\u0639 \u0641\u0648\u0631\u0627\u064B.";
+  } else if (currentAvgWeightGrams >= targetMarketWeightGrams * 0.95) {
+    status = "optimal_window";
+    recommendationArabic = "\u0627\u0644\u0642\u0637\u064A\u0639 \u0627\u0644\u0622\u0646 \u0641\u064A \u0646\u0627\u0641\u0630\u0629 \u0627\u0644\u0628\u064A\u0639 \u0648\u0627\u0644\u062A\u0633\u0648\u064A\u0642 \u0627\u0644\u0645\u062B\u0627\u0644\u064A\u0629. \u0645\u062A\u0648\u0633\u0637 \u0627\u0644\u0623\u0648\u0632\u0627\u0646 \u0645\u0645\u062A\u0627\u0632 \u0648\u0645\u0637\u0627\u0628\u0642 \u0644\u0644\u0645\u0648\u0627\u0635\u0641\u0627\u062A \u0627\u0644\u062A\u062C\u0627\u0631\u064A\u0629 \u0627\u0644\u0623\u0639\u0644\u0649 \u0633\u0639\u0631\u0627\u064B.";
+  } else if (currentAvgWeightGrams >= targetMarketWeightGrams * 0.85) {
+    status = "approaching_harvest";
+    recommendationArabic = "\u0627\u0644\u0642\u0637\u064A\u0639 \u064A\u0642\u062A\u0631\u0628 \u0645\u0646 \u0627\u0644\u0648\u0632\u0646 \u0627\u0644\u062A\u0633\u0648\u064A\u0642\u064A. \u0627\u0628\u062F\u0623 \u0628\u0627\u0644\u062A\u0646\u0633\u064A\u0642 \u0627\u0644\u0645\u0633\u0628\u0642 \u0645\u0639 \u0627\u0644\u062A\u062C\u0627\u0631 \u0648\u0645\u0633\u0624\u0648\u0644\u064A \u0627\u0644\u0645\u062C\u0627\u0632\u0631.";
+  }
+  return {
+    currentAgeDays: ageDays,
+    currentWeightGrams: currentAvgWeightGrams,
+    targetWeightGrams: targetMarketWeightGrams,
+    estimatedOptimalHarvestDay,
+    projectedProfitPerBirdEgp,
+    dailyMarginalGainEgp,
+    dailyFeedCostEgp,
+    recommendationArabic,
+    status
+  };
+}
+
+// shared/dataIntegrityGuards.ts
+function validatePopulationIntegrity(input) {
+  const {
+    birdsPlaced,
+    totalMortality,
+    totalCulls,
+    totalSoldBirds,
+    newMortality = 0,
+    newCulls = 0,
+    newSoldBirds = 0
+  } = input;
+  if (birdsPlaced <= 0) {
+    return {
+      isValid: false,
+      errorCode: "INVALID_PLACEMENT_COUNT",
+      errorMessageArabic: "\u0639\u062F\u062F \u0627\u0644\u0637\u064A\u0648\u0631 \u0627\u0644\u0645\u0633\u0643\u0646\u0629 \u0628\u0627\u0644\u062F\u0648\u0631\u0629 \u064A\u062C\u0628 \u0623\u0646 \u064A\u0643\u0648\u0646 \u0623\u0643\u0628\u0631 \u0645\u0646 \u0627\u0644\u0635\u0641\u0631.",
+      currentLiveBirds: 0
+    };
+  }
+  const totalDeductedSoFar = totalMortality + totalCulls + totalSoldBirds;
+  const currentLiveBirds = Math.max(0, birdsPlaced - totalDeductedSoFar);
+  const requestedDeduction = newMortality + newCulls + newSoldBirds;
+  if (requestedDeduction < 0) {
+    return {
+      isValid: false,
+      errorCode: "NEGATIVE_COUNT_PROHIBITED",
+      errorMessageArabic: "\u0644\u0627 \u064A\u0645\u0643\u0646 \u0625\u062F\u062E\u0627\u0644 \u0642\u064A\u0645 \u0639\u062F\u062F\u064A\u0629 \u0633\u0627\u0644\u0628\u0629 \u0644\u0644\u0637\u064A\u0648\u0631 \u0623\u0648 \u0627\u0644\u0645\u0628\u064A\u0639\u0627\u062A \u0623\u0648 \u0627\u0644\u0646\u0641\u0648\u0642.",
+      currentLiveBirds
+    };
+  }
+  if (requestedDeduction > currentLiveBirds) {
+    return {
+      isValid: false,
+      errorCode: "EXCEEDS_LIVE_POPULATION",
+      errorMessageArabic: `\u0627\u0644\u0639\u062F\u062F \u0627\u0644\u0645\u0637\u0644\u0648\u0628 (${requestedDeduction} \u0637\u0627\u0626\u0631) \u064A\u062A\u062C\u0627\u0648\u0632 \u0625\u062C\u0645\u0627\u0644\u064A \u0627\u0644\u0637\u064A\u0648\u0631 \u0627\u0644\u062D\u064A\u0629 \u0627\u0644\u0645\u062A\u0628\u0642\u064A\u0629 \u0641\u064A \u0627\u0644\u062F\u0648\u0631\u0629 (${currentLiveBirds} \u0637\u0627\u0626\u0631).`,
+      currentLiveBirds,
+      maxAllowableAddition: currentLiveBirds
+    };
+  }
+  return {
+    isValid: true,
+    currentLiveBirds: currentLiveBirds - requestedDeduction,
+    maxAllowableAddition: currentLiveBirds
+  };
+}
+function validateDailyIntakePlausibility(params) {
+  const { ageDays, currentLiveBirds, feedKg, waterLiters } = params;
+  const warnings = [];
+  const errors = [];
+  if (feedKg < 0) {
+    errors.push("\u0643\u0645\u064A\u0629 \u0627\u0644\u0639\u0644\u0641 \u0644\u0627 \u064A\u0645\u0643\u0646 \u0623\u0646 \u062A\u0643\u0648\u0646 \u0633\u0627\u0644\u0628\u0629.");
+  }
+  if (waterLiters < 0) {
+    errors.push("\u0643\u0645\u064A\u0629 \u0627\u0644\u0645\u064A\u0627\u0647 \u0644\u0627 \u064A\u0645\u0643\u0646 \u0623\u0646 \u062A\u0643\u0648\u0646 \u0633\u0627\u0644\u0628\u0629.");
+  }
+  if (currentLiveBirds > 0 && feedKg > 0) {
+    const gramsPerBird = feedKg * 1e3 / currentLiveBirds;
+    if (gramsPerBird > 350) {
+      errors.push(`\u0643\u0645\u064A\u0629 \u0627\u0644\u0639\u0644\u0641 \u063A\u064A\u0631 \u0645\u0646\u0637\u0642\u064A\u0629 \u0628\u064A\u0648\u0644\u0648\u062C\u064A\u0627\u064B (${Math.round(gramsPerBird)} \u062C\u0645/\u0637\u0627\u0626\u0631 \u0641\u064A \u0627\u0644\u064A\u0648\u0645\u060C \u0627\u0644\u062D\u062F \u0627\u0644\u0623\u0642\u0635\u0649 \u0627\u0644\u0637\u0628\u064A\u0639\u064A 350 \u062C\u0645).`);
+    } else if (gramsPerBird > 240 && ageDays < 25) {
+      warnings.push(`\u0627\u0633\u062A\u0647\u0644\u0627\u0643 \u0627\u0644\u0639\u0644\u0641 \u0645\u0631\u062A\u0641\u0639 \u062C\u062F\u0627\u064B \u0628\u0627\u0644\u0646\u0633\u0628\u0629 \u0644\u0639\u0645\u0631 ${ageDays} \u064A\u0648\u0645 (${Math.round(gramsPerBird)} \u062C\u0645/\u0637\u0627\u0626\u0631).`);
+    }
+  }
+  if (feedKg > 0 && waterLiters > 0) {
+    const ratio = waterLiters / feedKg;
+    if (ratio < 1) {
+      warnings.push(`\u0646\u0633\u0628\u0629 \u0627\u0633\u062A\u0647\u0644\u0627\u0643 \u0627\u0644\u0645\u064A\u0627\u0647 \u0644\u0644\u0639\u0644\u0641 \u0645\u0646\u062E\u0641\u0636\u0629 \u062C\u062F\u0627\u064B (${ratio.toFixed(2)})\u060C \u064A\u0631\u062C\u0649 \u0641\u062D\u0635 \u062E\u0637\u0648\u0637 \u0627\u0644\u0645\u064A\u0627\u0647 \u0648\u0627\u0644\u0646\u064A\u0628\u0644.`);
+    } else if (ratio > 3.2) {
+      warnings.push(`\u0646\u0633\u0628\u0629 \u0627\u0633\u062A\u0647\u0644\u0627\u0643 \u0627\u0644\u0645\u064A\u0627\u0647 \u0644\u0644\u0639\u0644\u0641 \u0645\u0631\u062A\u0641\u0639\u0629 \u062C\u062F\u0627\u064B (${ratio.toFixed(2)})\u060C \u0642\u062F \u062A\u0634\u064A\u0631 \u0644\u062A\u0633\u0631\u064A\u0628 \u0641\u064A \u0627\u0644\u0646\u064A\u0628\u0644 \u0623\u0648 \u0625\u062C\u0647\u0627\u062F \u062D\u0631\u0627\u0631\u064A \u0634\u062F\u064A\u062F.`);
+    }
+  }
+  return {
+    isValid: errors.length === 0,
+    warnings,
+    errors
+  };
+}
+function validateSaleWeighBatch(params) {
+  const { grossWeightGrams, tareWeightGrams, cageCount, birdsPerCage = 0 } = params;
+  if (grossWeightGrams <= 0) {
+    return {
+      isValid: false,
+      netWeightGrams: 0,
+      averageBirdWeightGrams: 0,
+      errorArabic: "\u0627\u0644\u0648\u0632\u0646 \u0627\u0644\u0642\u0627\u0626\u0645 (\u0627\u0644\u0625\u062C\u0645\u0627\u0644\u064A) \u064A\u062C\u0628 \u0623\u0646 \u064A\u0643\u0648\u0646 \u0623\u0643\u0628\u0631 \u0645\u0646 \u0627\u0644\u0635\u0641\u0631."
+    };
+  }
+  if (tareWeightGrams >= grossWeightGrams) {
+    return {
+      isValid: false,
+      netWeightGrams: 0,
+      averageBirdWeightGrams: 0,
+      errorArabic: "\u0648\u0632\u0646 \u0627\u0644\u0641\u0627\u0631\u063A (\u0627\u0644\u0623\u0642\u0641\u0627\u0635) \u0644\u0627 \u064A\u0645\u0643\u0646 \u0623\u0646 \u064A\u0643\u0648\u0646 \u0645\u0633\u0627\u0648\u064A\u0627\u064B \u0623\u0648 \u0623\u0643\u0628\u0631 \u0645\u0646 \u0627\u0644\u0648\u0632\u0646 \u0627\u0644\u0625\u062C\u0645\u0627\u0644\u064A."
+    };
+  }
+  if (cageCount <= 0) {
+    return {
+      isValid: false,
+      netWeightGrams: 0,
+      averageBirdWeightGrams: 0,
+      errorArabic: "\u0639\u062F\u062F \u0627\u0644\u0623\u0642\u0641\u0627\u0635 \u064A\u062C\u0628 \u0623\u0646 \u064A\u0643\u0648\u0646 \u0642\u0641\u0635\u0627\u064B \u0648\u0627\u062D\u062F\u0627\u064B \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644."
+    };
+  }
+  const netWeightGrams = grossWeightGrams - tareWeightGrams;
+  const totalBirds = cageCount * (birdsPerCage > 0 ? birdsPerCage : 1);
+  const avgBirdWeight = totalBirds > 0 ? Math.round(netWeightGrams / totalBirds) : 0;
+  return {
+    isValid: true,
+    netWeightGrams,
+    averageBirdWeightGrams: avgBirdWeight
+  };
+}
+
 // server/routers.ts
 var appRouter = router({
   system: systemRouter,
@@ -4702,6 +5130,83 @@ var appRouter = router({
   }),
   weather: router({
     forCycleDay: protectedProcedure.input(z2.object({ cycleId: z2.number().int().positive(), weatherDate: z2.string().regex(/^\d{4}-\d{2}-\d{2}$/) })).query(({ ctx, input }) => getCycleDayWeather(ctx.user.id, input))
+  }),
+  intelligence: router({
+    analyzeFlock: protectedProcedure.input(
+      z2.object({
+        breed: z2.enum(["ross_308", "cobb_500", "arbor_acres", "hubbard", "ir_standard"]).default("ross_308"),
+        ageDays: z2.number().int().positive(),
+        currentLiveBirds: z2.number().int().nonnegative(),
+        todayMortality: z2.number().int().nonnegative(),
+        past3DaysAvgMortality: z2.number().nonnegative(),
+        latestAvgWeightGrams: z2.number().nonnegative().optional(),
+        todayFeedKg: z2.number().nonnegative(),
+        todayWaterLiters: z2.number().nonnegative(),
+        ambientTempC: z2.number().optional()
+      })
+    ).query(({ input }) => analyzeFlockAnomalies(input)),
+    harvestOptimizer: protectedProcedure.input(
+      z2.object({
+        breed: z2.enum(["ross_308", "cobb_500", "arbor_acres", "hubbard", "ir_standard"]).default("ross_308"),
+        ageDays: z2.number().int().positive(),
+        currentAvgWeightGrams: z2.number().int().positive(),
+        feedPricePerKgEgp: z2.number().positive(),
+        liveChickenPricePerKgEgp: z2.number().positive(),
+        targetMarketWeightGrams: z2.number().int().positive().optional()
+      })
+    ).query(({ input }) => calculateOptimalHarvestWindow(input)),
+    uniformity: protectedProcedure.input(z2.object({ weightsGrams: z2.array(z2.number().positive()) })).query(({ input }) => calculateWeightUniformity(input.weightsGrams)),
+    waterDiagnostic: protectedProcedure.input(
+      z2.object({
+        waterLiters: z2.number().nonnegative(),
+        feedKg: z2.number().nonnegative(),
+        ambientTempC: z2.number().optional()
+      })
+    ).query(({ input }) => evaluateWaterToFeedRatio(input.waterLiters, input.feedKg, input.ambientTempC)),
+    advancedEpef: protectedProcedure.input(
+      z2.object({
+        birdsPlaced: z2.number().int().positive(),
+        totalMortality: z2.number().int().nonnegative(),
+        averageWeightGrams: z2.number().positive(),
+        actualFcr: z2.number().positive(),
+        ageDays: z2.number().int().positive()
+      })
+    ).query(({ input }) => calculateAdvancedEpef(input)),
+    breedStandardTarget: protectedProcedure.input(
+      z2.object({
+        breed: z2.enum(["ross_308", "cobb_500", "arbor_acres", "hubbard", "ir_standard"]),
+        ageDays: z2.number().int().positive()
+      })
+    ).query(({ input }) => getBreedTargetForDay(input.breed, input.ageDays))
+  }),
+  guards: router({
+    validatePopulation: protectedProcedure.input(
+      z2.object({
+        birdsPlaced: z2.number().int(),
+        totalMortality: z2.number().int(),
+        totalCulls: z2.number().int(),
+        totalSoldBirds: z2.number().int(),
+        newMortality: z2.number().int().optional(),
+        newCulls: z2.number().int().optional(),
+        newSoldBirds: z2.number().int().optional()
+      })
+    ).query(({ input }) => validatePopulationIntegrity(input)),
+    validateDailyIntake: protectedProcedure.input(
+      z2.object({
+        ageDays: z2.number().int().positive(),
+        currentLiveBirds: z2.number().int().nonnegative(),
+        feedKg: z2.number(),
+        waterLiters: z2.number()
+      })
+    ).query(({ input }) => validateDailyIntakePlausibility(input)),
+    validateSaleBatch: protectedProcedure.input(
+      z2.object({
+        grossWeightGrams: z2.number(),
+        tareWeightGrams: z2.number(),
+        cageCount: z2.number().int(),
+        birdsPerCage: z2.number().int().optional()
+      })
+    ).query(({ input }) => validateSaleWeighBatch(input))
   })
 });
 

@@ -3,7 +3,7 @@
  * محرك ذكاء الإنتاج والتحليلات البيولوجية لمزارع التسمين
  */
 
-export type PoultryBreed = "ross_308" | "cobb_500" | "ir_standard";
+export type PoultryBreed = "ross_308" | "cobb_500" | "arbor_acres" | "hubbard" | "ir_standard";
 
 export interface BreedDayTarget {
   ageDays: number;
@@ -15,7 +15,7 @@ export interface BreedDayTarget {
 }
 
 // ────────────────────────────────────────────────────────────────
-// Breed Performance Standards (Ross 308 & Cobb 500 Performance Objectives)
+// Breed Performance Standards (Ross 308, Cobb 500, Arbor Acres, Hubbard)
 // ────────────────────────────────────────────────────────────────
 
 export const ROSS_308_OBJECTIVES: Record<number, BreedDayTarget> = {
@@ -43,15 +43,18 @@ export const COBB_500_OBJECTIVES: Record<number, BreedDayTarget> = {
  */
 export function getBreedTargetForDay(breed: PoultryBreed, day: number): BreedDayTarget {
   const safeDay = Math.max(1, Math.min(50, Math.round(day)));
-  const table = breed === "cobb_500" ? COBB_500_OBJECTIVES : ROSS_308_OBJECTIVES;
+
+  let factor = 1.0;
+  if (breed === "cobb_500") factor = 0.985;
+  else if (breed === "arbor_acres") factor = 0.990;
+  else if (breed === "hubbard") factor = 0.975;
 
   // Approximate realistic cubic curve for smooth daily targets
-  const factor = breed === "cobb_500" ? 0.985 : 1.0;
   const targetWeight = Math.round(
     factor * (42 + 22 * safeDay + 1.25 * Math.pow(safeDay, 2) + 0.008 * Math.pow(safeDay, 3))
   );
   const targetFcr = Number((0.85 + (safeDay / 42) * 0.70).toFixed(2));
-  const cumulativeFeed = Math.round((targetWeight * targetFcr));
+  const cumulativeFeed = Math.round(targetWeight * targetFcr);
   const dailyFeed = Math.round(cumulativeFeed / safeDay);
   const dailyGain = Math.round((targetWeight - 42) / safeDay);
 
@@ -217,7 +220,7 @@ export function evaluateWaterToFeedRatio(
 }
 
 // ────────────────────────────────────────────────────────────────
-// European Production Efficiency Factor (EPEF / EEI)
+// European Production Efficiency Factor (EPEF / EEI) & Performance Index
 // ────────────────────────────────────────────────────────────────
 
 export interface EpefAssessment {
@@ -225,10 +228,13 @@ export interface EpefAssessment {
   ratingArabic: string;
   grade: "world_class" | "excellent" | "good" | "average" | "poor";
   adjustedFcr2kg: number;
+  performanceIndex: number;
+  livabilityPercentage: number;
+  averageDailyGainGrams: number;
 }
 
 /**
- * Calculates EPEF and standardized Adjusted FCR to 2.0kg body weight
+ * Calculates EPEF, Performance Index (PI), and standardized Adjusted FCR to 2.0kg body weight
  */
 export function calculateAdvancedEpef({
   birdsPlaced,
@@ -247,11 +253,15 @@ export function calculateAdvancedEpef({
     return null;
   }
 
-  const livabilityPct = Math.max(0, ((birdsPlaced - totalMortality) / birdsPlaced) * 100);
+  const livabilityPct = Number((Math.max(0, ((birdsPlaced - totalMortality) / birdsPlaced) * 100)).toFixed(2));
   const avgWeightKg = averageWeightGrams / 1000;
+  const adg = Number((averageWeightGrams / ageDays).toFixed(1));
 
   // EPEF = (Livability % * Average Weight kg * 100) / (Age days * FCR)
   const epef = Math.round((livabilityPct * avgWeightKg * 100) / (ageDays * actualFcr));
+
+  // Performance Index (PI) = (Livability % * Average Live Weight kg) / FCR
+  const performanceIndex = Number(((livabilityPct * avgWeightKg) / actualFcr).toFixed(1));
 
   // Adjusted FCR to standard 2.0kg: FCR_adj = Actual_FCR - ((Weight_kg - 2.0) * 0.33)
   const adjustedFcr = Number((actualFcr - (avgWeightKg - 2.0) * 0.33).toFixed(2));
@@ -281,5 +291,8 @@ export function calculateAdvancedEpef({
     ratingArabic,
     grade,
     adjustedFcr2kg: Math.max(0.8, adjustedFcr),
+    performanceIndex,
+    livabilityPercentage: livabilityPct,
+    averageDailyGainGrams: adg,
   };
 }

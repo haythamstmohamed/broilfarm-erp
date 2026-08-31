@@ -100,6 +100,9 @@ import { getCycleDayWeather } from "./weather";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { analyzeFlockAnomalies, calculateOptimalHarvestWindow } from "../shared/decisionIntelligence";
+import { calculateWeightUniformity, evaluateWaterToFeedRatio, calculateAdvancedEpef, getBreedTargetForDay } from "../shared/productionIntelligence";
+import { validatePopulationIntegrity, validateDailyIntakePlausibility, validateSaleWeighBatch } from "../shared/dataIntegrityGuards";
 
 export const appRouter = router({
   system: systemRouter,
@@ -462,6 +465,101 @@ export const appRouter = router({
   }),
   weather: router({
     forCycleDay: protectedProcedure.input(z.object({ cycleId: z.number().int().positive(), weatherDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) })).query(({ ctx, input }) => getCycleDayWeather(ctx.user.id, input)),
+  }),
+  intelligence: router({
+    analyzeFlock: protectedProcedure
+      .input(
+        z.object({
+          breed: z.enum(["ross_308", "cobb_500", "arbor_acres", "hubbard", "ir_standard"]).default("ross_308"),
+          ageDays: z.number().int().positive(),
+          currentLiveBirds: z.number().int().nonnegative(),
+          todayMortality: z.number().int().nonnegative(),
+          past3DaysAvgMortality: z.number().nonnegative(),
+          latestAvgWeightGrams: z.number().nonnegative().optional(),
+          todayFeedKg: z.number().nonnegative(),
+          todayWaterLiters: z.number().nonnegative(),
+          ambientTempC: z.number().optional(),
+        })
+      )
+      .query(({ input }) => analyzeFlockAnomalies(input)),
+    harvestOptimizer: protectedProcedure
+      .input(
+        z.object({
+          breed: z.enum(["ross_308", "cobb_500", "arbor_acres", "hubbard", "ir_standard"]).default("ross_308"),
+          ageDays: z.number().int().positive(),
+          currentAvgWeightGrams: z.number().int().positive(),
+          feedPricePerKgEgp: z.number().positive(),
+          liveChickenPricePerKgEgp: z.number().positive(),
+          targetMarketWeightGrams: z.number().int().positive().optional(),
+        })
+      )
+      .query(({ input }) => calculateOptimalHarvestWindow(input)),
+    uniformity: protectedProcedure
+      .input(z.object({ weightsGrams: z.array(z.number().positive()) }))
+      .query(({ input }) => calculateWeightUniformity(input.weightsGrams)),
+    waterDiagnostic: protectedProcedure
+      .input(
+        z.object({
+          waterLiters: z.number().nonnegative(),
+          feedKg: z.number().nonnegative(),
+          ambientTempC: z.number().optional(),
+        })
+      )
+      .query(({ input }) => evaluateWaterToFeedRatio(input.waterLiters, input.feedKg, input.ambientTempC)),
+    advancedEpef: protectedProcedure
+      .input(
+        z.object({
+          birdsPlaced: z.number().int().positive(),
+          totalMortality: z.number().int().nonnegative(),
+          averageWeightGrams: z.number().positive(),
+          actualFcr: z.number().positive(),
+          ageDays: z.number().int().positive(),
+        })
+      )
+      .query(({ input }) => calculateAdvancedEpef(input)),
+    breedStandardTarget: protectedProcedure
+      .input(
+        z.object({
+          breed: z.enum(["ross_308", "cobb_500", "arbor_acres", "hubbard", "ir_standard"]),
+          ageDays: z.number().int().positive(),
+        })
+      )
+      .query(({ input }) => getBreedTargetForDay(input.breed, input.ageDays)),
+  }),
+  guards: router({
+    validatePopulation: protectedProcedure
+      .input(
+        z.object({
+          birdsPlaced: z.number().int(),
+          totalMortality: z.number().int(),
+          totalCulls: z.number().int(),
+          totalSoldBirds: z.number().int(),
+          newMortality: z.number().int().optional(),
+          newCulls: z.number().int().optional(),
+          newSoldBirds: z.number().int().optional(),
+        })
+      )
+      .query(({ input }) => validatePopulationIntegrity(input)),
+    validateDailyIntake: protectedProcedure
+      .input(
+        z.object({
+          ageDays: z.number().int().positive(),
+          currentLiveBirds: z.number().int().nonnegative(),
+          feedKg: z.number(),
+          waterLiters: z.number(),
+        })
+      )
+      .query(({ input }) => validateDailyIntakePlausibility(input)),
+    validateSaleBatch: protectedProcedure
+      .input(
+        z.object({
+          grossWeightGrams: z.number(),
+          tareWeightGrams: z.number(),
+          cageCount: z.number().int(),
+          birdsPerCage: z.number().int().optional(),
+        })
+      )
+      .query(({ input }) => validateSaleWeighBatch(input)),
   }),
 });
 
