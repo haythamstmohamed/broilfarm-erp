@@ -952,6 +952,9 @@ async function getDb() {
   }
   return _db;
 }
+function getPool() {
+  return _pool;
+}
 
 // server/db/users.ts
 init_schema();
@@ -4194,12 +4197,29 @@ function buildCronUser(userInfo) {
 var sdk = new SDKServer();
 
 // server/db/localAuth.ts
+async function getUserByEmailWithFallback(cleanEmail) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  try {
+    const [user] = await db.select().from(users).where(eq22(users.email, cleanEmail)).limit(1);
+    return user;
+  } catch (err) {
+    console.warn("[localAuth] Direct select failed, attempting schema bootstrap:", err.message);
+    const pool = getPool();
+    if (pool) {
+      await ensureDatabaseSchema(pool);
+      const [user] = await db.select().from(users).where(eq22(users.email, cleanEmail)).limit(1);
+      return user;
+    }
+    throw err;
+  }
+}
 async function registerLocalUser(input) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
   const cleanEmail = input.email.trim().toLowerCase();
   const cleanName = input.name.trim();
-  const [existingUser] = await db.select().from(users).where(eq22(users.email, cleanEmail)).limit(1);
+  const existingUser = await getUserByEmailWithFallback(cleanEmail);
   if (existingUser) {
     throw new Error("\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0645\u0633\u062C\u0644 \u0628\u0627\u0644\u0641\u0639\u0644\u060C \u064A\u0631\u062C\u0649 \u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u062F\u062E\u0648\u0644");
   }
@@ -4236,7 +4256,7 @@ async function loginLocalUser(input) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
   const cleanEmail = input.email.trim().toLowerCase();
-  const [user] = await db.select().from(users).where(eq22(users.email, cleanEmail)).limit(1);
+  const user = await getUserByEmailWithFallback(cleanEmail);
   if (!user || !user.passwordHash) {
     throw new Error("\u0627\u0644\u0628\u0631\u064A\u062F \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u0623\u0648 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u063A\u064A\u0631 \u0635\u062D\u064A\u062D\u0629");
   }

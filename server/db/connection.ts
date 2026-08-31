@@ -49,3 +49,7 @@ export async function getDb() {
 
   return _db;
 }
+
+export function getPool() {
+  return _pool;
+}

@@ -3,7 +3,27 @@ import { eq } from "drizzle-orm";
 import { companies, users } from "../../drizzle/schema";
 import { hashPassword, verifyPassword } from "../_core/password";
 import { sdk } from "../_core/sdk";
-import { getDb } from "./connection";
+import { getDb, getPool } from "./connection";
+import { ensureDatabaseSchema } from "./autoMigrate";
+
+async function getUserByEmailWithFallback(cleanEmail: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+
+  try {
+    const [user] = await db.select().from(users).where(eq(users.email, cleanEmail)).limit(1);
+    return user;
+  } catch (err: any) {
+    console.warn("[localAuth] Direct select failed, attempting schema bootstrap:", err.message);
+    const pool = getPool();
+    if (pool) {
+      await ensureDatabaseSchema(pool);
+      const [user] = await db.select().from(users).where(eq(users.email, cleanEmail)).limit(1);
+      return user;
+    }
+    throw err;
+  }
+}
 
 export async function registerLocalUser(input: {
   name: string;
@@ -19,7 +39,7 @@ export async function registerLocalUser(input: {
   const cleanName = input.name.trim();
 
   // Check if email already exists
-  const [existingUser] = await db.select().from(users).where(eq(users.email, cleanEmail)).limit(1);
+  const existingUser = await getUserByEmailWithFallback(cleanEmail);
   if (existingUser) {
     throw new Error("البريد الإلكتروني مسجل بالفعل، يرجى تسجيل الدخول");
   }
@@ -70,7 +90,7 @@ export async function loginLocalUser(input: { email: string; password: string })
   if (!db) throw new Error("Database is unavailable");
 
   const cleanEmail = input.email.trim().toLowerCase();
-  const [user] = await db.select().from(users).where(eq(users.email, cleanEmail)).limit(1);
+  const user = await getUserByEmailWithFallback(cleanEmail);
 
   if (!user || !user.passwordHash) {
     throw new Error("البريد الإلكتروني أو كلمة المرور غير صحيحة");
