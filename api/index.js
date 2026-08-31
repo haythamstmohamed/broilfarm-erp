@@ -506,7 +506,7 @@ async function ensureDatabaseSchema(pool) {
       \`maxUsersPerFarm\` INT NOT NULL DEFAULT 5,
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 2. Users table
     `CREATE TABLE IF NOT EXISTS \`users\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -522,7 +522,7 @@ async function ensureDatabaseSchema(pool) {
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       \`lastSignedIn\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 3. Farms table
     `CREATE TABLE IF NOT EXISTS \`farms\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -537,7 +537,7 @@ async function ensureDatabaseSchema(pool) {
       \`status\` ENUM('active', 'inactive', 'maintenance') NOT NULL DEFAULT 'active',
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 4. Houses table
     `CREATE TABLE IF NOT EXISTS \`houses\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -547,7 +547,7 @@ async function ensureDatabaseSchema(pool) {
       \`status\` ENUM('empty', 'preparing', 'active', 'cleaning', 'maintenance') NOT NULL DEFAULT 'empty',
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 5. Cycles table
     `CREATE TABLE IF NOT EXISTS \`cycles\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -560,7 +560,7 @@ async function ensureDatabaseSchema(pool) {
       \`targetMarketWeight\` INT,
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 6. Cycle House Assignments
     `CREATE TABLE IF NOT EXISTS \`cycleHouseAssignments\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -570,7 +570,7 @@ async function ensureDatabaseSchema(pool) {
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       UNIQUE KEY \`cycle_house_assignment_unique\` (\`cycleId\`, \`houseId\`)
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 7. Cage Sections
     `CREATE TABLE IF NOT EXISTS \`cageSections\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -580,7 +580,7 @@ async function ensureDatabaseSchema(pool) {
       \`cageCount\` INT NOT NULL,
       \`capacityPerCage\` INT NOT NULL,
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 8. Daily Records
     `CREATE TABLE IF NOT EXISTS \`dailyRecords\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -595,7 +595,7 @@ async function ensureDatabaseSchema(pool) {
       \`notes\` TEXT,
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 9. Health Events
     `CREATE TABLE IF NOT EXISTS \`healthEvents\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -608,7 +608,7 @@ async function ensureDatabaseSchema(pool) {
       \`administrationRoute\` VARCHAR(120),
       \`notes\` TEXT,
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 10. Weight Samples
     `CREATE TABLE IF NOT EXISTS \`weightSamples\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -618,7 +618,7 @@ async function ensureDatabaseSchema(pool) {
       \`averageWeightGrams\` INT NOT NULL,
       \`sampleSize\` INT,
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 11. Cycle Cage Occupancy
     `CREATE TABLE IF NOT EXISTS \`cycleCageOccupancy\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -628,7 +628,7 @@ async function ensureDatabaseSchema(pool) {
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       UNIQUE KEY \`occupancy_cycle_section_unique\` (\`cycleId\`, \`cageSectionId\`)
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 12. Farm Memberships
     `CREATE TABLE IF NOT EXISTS \`farmMemberships\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -641,7 +641,7 @@ async function ensureDatabaseSchema(pool) {
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       UNIQUE KEY \`membership_user_farm_unique\` (\`userId\`, \`farmId\`)
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 13. Invitation Codes
     `CREATE TABLE IF NOT EXISTS \`invitationCodes\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -659,7 +659,7 @@ async function ensureDatabaseSchema(pool) {
       \`notes\` TEXT,
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 14. Feed Inventory Settings
     `CREATE TABLE IF NOT EXISTS \`feedInventorySettings\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -668,7 +668,7 @@ async function ensureDatabaseSchema(pool) {
       \`reorderPointBags\` INT NOT NULL DEFAULT 0,
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 15. Feed Inventory Transactions
     `CREATE TABLE IF NOT EXISTS \`feedInventoryTransactions\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -681,7 +681,7 @@ async function ensureDatabaseSchema(pool) {
       \`notes\` TEXT,
       \`createdByUserId\` INT NOT NULL,
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 16. Farm Expenses
     `CREATE TABLE IF NOT EXISTS \`farmExpenses\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -700,7 +700,7 @@ async function ensureDatabaseSchema(pool) {
       \`createdByUserId\` INT NOT NULL,
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 17. Medicine Inventory
     `CREATE TABLE IF NOT EXISTS \`medicineInventory\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -717,7 +717,7 @@ async function ensureDatabaseSchema(pool) {
       \`createdByUserId\` INT NOT NULL,
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 18. Workers
     `CREATE TABLE IF NOT EXISTS \`workers\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -730,7 +730,7 @@ async function ensureDatabaseSchema(pool) {
       \`createdByUserId\` INT NOT NULL,
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 19. Worker Account Entries
     `CREATE TABLE IF NOT EXISTS \`workerAccountEntries\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -744,7 +744,7 @@ async function ensureDatabaseSchema(pool) {
       \`createdByUserId\` INT NOT NULL,
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 20. Traders
     `CREATE TABLE IF NOT EXISTS \`traders\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -757,7 +757,7 @@ async function ensureDatabaseSchema(pool) {
       \`isActive\` BOOLEAN NOT NULL DEFAULT TRUE,
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 21. Sales
     `CREATE TABLE IF NOT EXISTS \`sales\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -785,7 +785,7 @@ async function ensureDatabaseSchema(pool) {
       \`createdByUserId\` INT NOT NULL,
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 22. Sale Weigh Batches
     `CREATE TABLE IF NOT EXISTS \`saleWeighBatches\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -804,7 +804,7 @@ async function ensureDatabaseSchema(pool) {
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       UNIQUE KEY \`sale_batch_sequence_unique\` (\`saleId\`, \`sequence\`)
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 23. Sale Payments
     `CREATE TABLE IF NOT EXISTS \`salePayments\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -817,7 +817,7 @@ async function ensureDatabaseSchema(pool) {
       \`notes\` TEXT,
       \`createdByUserId\` INT NOT NULL,
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 24. Sale Activities
     `CREATE TABLE IF NOT EXISTS \`saleActivities\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -827,7 +827,7 @@ async function ensureDatabaseSchema(pool) {
       \`action\` ENUM('sale_started', 'sale_updated', 'sale_completed', 'batch_added', 'batch_updated', 'batch_deleted', 'batches_reordered', 'payment_added', 'sale_deleted') NOT NULL,
       \`details\` TEXT,
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 25. Audit Logs
     `CREATE TABLE IF NOT EXISTS \`auditLogs\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -844,7 +844,7 @@ async function ensureDatabaseSchema(pool) {
       \`ipAddress\` VARCHAR(45),
       \`userAgent\` VARCHAR(255),
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 26. Alerts
     `CREATE TABLE IF NOT EXISTS \`alerts\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -862,7 +862,7 @@ async function ensureDatabaseSchema(pool) {
       \`resolvedAt\` TIMESTAMP NULL,
       \`metadata\` TEXT,
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );`,
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     // 27. Sensor Readings
     `CREATE TABLE IF NOT EXISTS \`sensorReadings\` (
       \`id\` INT AUTO_INCREMENT PRIMARY KEY,
@@ -874,7 +874,7 @@ async function ensureDatabaseSchema(pool) {
       \`deviceId\` VARCHAR(100),
       \`readingTime\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );`
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`
   ];
   const COLUMN_ALTERATIONS = [
     `ALTER TABLE \`users\` ADD COLUMN \`companyId\` INT NULL;`,
@@ -895,18 +895,18 @@ async function ensureDatabaseSchema(pool) {
   try {
     for (const sql6 of DDL_STATEMENTS) {
       try {
-        await pool.execute(sql6);
+        await pool.query(sql6);
       } catch (err) {
-        if (err.errno !== 1050) {
-          console.warn("[AutoMigrate] Notice during table creation:", err.message);
+        if (err.errno !== 1050 && err.code !== "ER_TABLE_EXISTS_ERROR") {
+          console.warn("[AutoMigrate] Table check notice:", err.message);
         }
       }
     }
     for (const sql6 of COLUMN_ALTERATIONS) {
       try {
-        await pool.execute(sql6);
+        await pool.query(sql6);
       } catch (err) {
-        if (err.errno !== 1060) {
+        if (err.errno !== 1060 && err.code !== "ER_DUP_FIELDNAME") {
         }
       }
     }
