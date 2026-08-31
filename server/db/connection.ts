@@ -1,10 +1,13 @@
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 
+import { ensureDatabaseSchema } from "./autoMigrate";
+
 let _pool: mysql.Pool | null = null;
 
 const createDatabase = (pool: mysql.Pool) => drizzle(pool);
 let _db: ReturnType<typeof createDatabase> | null = null;
+let _schemaEnsured = false;
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
@@ -34,5 +37,15 @@ export async function getDb() {
       _db = null;
     }
   }
+
+  if (_pool && !_schemaEnsured) {
+    try {
+      await ensureDatabaseSchema(_pool);
+      _schemaEnsured = true;
+    } catch (err) {
+      console.warn("[Database] Schema check encountered non-fatal error:", err);
+    }
+  }
+
   return _db;
 }

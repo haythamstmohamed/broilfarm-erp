@@ -21,3 +21,4 @@ export * from "./medicineInventory";
 export * from "./sensors";
 export * from "./backup";
 export * from "./localAuth";
+export * from "./autoMigrate";
